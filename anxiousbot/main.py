@@ -120,17 +120,19 @@ class ArbitrageBot:
         except Exception as e:
             print(f"Error fetching trading fees for {exchange_name}: {e}")
 
-    def match_asks(self, buy_ask, sell_ask):
+    def match_asks(self, buy_asks, sell_asks):
         buy_index = 0
         sell_index = 0
         max_amount = 0
         potential_profit = 0.0
 
-        while buy_index < len(buy_ask) and sell_index < len(sell_ask):
-            buy_price = buy_ask[buy_index][0]
-            buy_amount = buy_ask[buy_index][1]
-            sell_price = sell_ask[sell_index][0]
-            sell_amount = sell_ask[sell_index][1]
+        sell_asks = sorted(sell_asks, key=lambda x: x[0], reverse=True)
+
+        while buy_index < len(buy_asks) and sell_index < len(sell_asks):
+            buy_price = buy_asks[buy_index][0]
+            buy_amount = buy_asks[buy_index][1]
+            sell_price = sell_asks[sell_index][0]
+            sell_amount = sell_asks[sell_index][1]
 
             # Ensure buy price is less than or equal to sell price for a match
             if buy_price <= sell_price:
@@ -141,13 +143,13 @@ class ArbitrageBot:
                 potential_profit += matched_amount * (sell_price - buy_price)
 
                 # Update the amounts
-                buy_ask[buy_index][1] -= matched_amount
-                sell_ask[sell_index][1] -= matched_amount
+                buy_asks[buy_index][1] -= matched_amount
+                sell_asks[sell_index][1] -= matched_amount
 
                 # Remove orders that are fully matched
-                if buy_ask[buy_index][1] == 0:
+                if buy_asks[buy_index][1] == 0:
                     buy_index += 1
-                if sell_ask[sell_index][1] == 0:
+                if sell_asks[sell_index][1] == 0:
                     sell_index += 1
             else:
                 # If the prices don't match, exit the loop
@@ -159,7 +161,7 @@ class ArbitrageBot:
         }
 
     async def process_arbitrage(
-        self, symbol, buy_exchange, buy_price, buy_asks, sell_exchange, sell_price, sell_asks
+        self, symbol, buy_exchange, buy_asks, sell_exchange, sell_asks
     ):
         """
         Process arbitrage opportunity based on buy and sell prices.
@@ -192,22 +194,19 @@ class ArbitrageBot:
 
         return matched_asks
 
-    async def trade_arbitrage(self, exchange_name, symbol, ticker, order_book):
+    async def trade_arbitrage(self, exchange_name, symbol, order_book):
         """
         Function to process trade updates and check for arbitrage opportunities.
 
         Parameters:
         - exchange_name (str): Name of the exchange.
         - symbol (str): Trading pair symbol.
-        - price (float): Trade price.
-
+        - order_book (list): Order books.
         Returns:
         - None
         """
         # Update prices for the exchange
-        price = ticker["last"]
         asks = order_book['asks']
-        self.exchanges[exchange_name]["prices"][symbol] = price
         self.exchanges[exchange_name]["asks"][symbol] = asks
 
         # Check for arbitrage opportunities
@@ -216,37 +215,32 @@ class ArbitrageBot:
         opportunities = []
 
         for other_exchange in other_exchanges:
-            if symbol in self.exchanges[other_exchange]["prices"] and symbol in self.exchanges[other_exchange]["asks"]:
-                other_price = self.exchanges[other_exchange]["prices"][symbol]
+            if symbol in self.exchanges[other_exchange]["asks"]:
                 other_asks = self.exchanges[other_exchange]["asks"][symbol]
 
                 data = await self.process_arbitrage(
-                    symbol, exchange_name, price, asks, other_exchange, other_price, other_asks
+                    symbol, exchange_name, asks, other_exchange, other_asks
                 )
 
                 opportunities += [
                     {
                         'buy_exchange': exchange_name,
-                        'buy_price': price,
                         'buy_asks': asks,
                         'sell_exchange': other_exchange,
-                        'sell_price': other_price,
                         'sell_asks': other_asks,
                         **data
                     }
                 ]
                 
                 data = await self.process_arbitrage(
-                    symbol, other_exchange, other_price, other_asks, exchange_name, price, asks
+                    symbol, other_exchange, other_asks, exchange_name, asks
                 )
 
                 opportunities += [
                     {
                         'buy_exchange': other_exchange,
-                        'buy_price': other_price,
                         'buy_asks': other_asks,
                         'sell_exchange': exchange_name,
-                        'sell_price': price,
                         'sell_asks': asks,
                         **data
                     }
@@ -254,11 +248,18 @@ class ArbitrageBot:
 
         opportunities.sort(
             key=lambda x: x['potential_profit'], reverse=True)
+
+        if len(opportunities) == 0:
+            return
+
         opportunity = opportunities[0]
-        if opportunity['potential_profit'] > 0:
-            print(
-                f"Arbitrage opportunity! Buy {symbol} on {opportunity['buy_exchange']} sell on {opportunity['sell_exchange']}. Profit: {opportunity['potential_profit']:.2f} if trading {opportunity['max_amount']:.2f}"
-            )
+
+        if opportunity['potential_profit'] <= 0:
+            return
+
+        print(
+            f"Arbitrage opportunity! Buy {symbol} on {opportunity['buy_exchange']} sell on {opportunity['sell_exchange']}. Profit: {opportunity['potential_profit']:.2f} if trading {opportunity['max_amount']:.2f}"
+        )
 
 
     async def subscribe_exchange(self, exchange_name, symbols):
@@ -276,9 +277,8 @@ class ArbitrageBot:
         async def watch_symbol(client, symbol):
             while True:
                 try:
-                    ticker = await client.watch_ticker(symbol)
                     order_book = await client.watch_order_book(symbol)
-                    await self.trade_arbitrage(client.id, symbol, ticker, order_book)
+                    await self.trade_arbitrage(client.id, symbol, order_book)
                 except ExchangeClosedByUser:
                     print(f"Task for {symbol} on {client.name} was closed.")
                     break  # Exit the loop when task is cancelled
