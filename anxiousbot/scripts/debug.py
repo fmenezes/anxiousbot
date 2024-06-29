@@ -108,6 +108,9 @@ def _print_book_orders(book_orders):
     green_color = "\033[92m"
     no_color = "\033[0m"
 
+    if len(book_orders) <= 0:
+        return
+
     tabs = []
     for book_order in book_orders:
         table_bids = tabulate.tabulate(
@@ -219,10 +222,8 @@ async def _watch_book_order(client, symbol):
 def _process_book_orders():
     global deals
     os.system("cls" if os.name == "nt" else "clear")
-    for symbol, data in book_orders_per_symbol.items():
-        book_orders = []
-        for client_id, book_order in data.items():
-            book_orders += [book_order]
+    for data in book_orders_per_symbol.values():
+        book_orders = list(data.values())
         _print_book_orders(book_orders)
         if len(book_orders) > 1:
             deals += _match_book_orders(book_orders)
@@ -244,7 +245,7 @@ async def _run():
     for client in clients:
         await client.load_markets()
 
-    symbols = ["LTC/USDT"]
+    symbols = ["BTC/USDT"]
     try:
         tasks = []
         for symbol in symbols:
