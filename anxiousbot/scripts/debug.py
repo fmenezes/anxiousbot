@@ -1,5 +1,4 @@
 import asyncio
-import itertools
 import os
 from datetime import datetime
 
@@ -10,33 +9,25 @@ from dotenv import load_dotenv
 
 def _match_book_orders(book_orders):
     deals = []
-    for a in book_orders:
-        for b in book_orders:
-            if b["name"] == a["name"]:
+    balance = {
+        'USDT': 1000.0,
+    }
+    for buy_exchange in book_orders:
+        for sell_exchange in book_orders:
+            if sell_exchange["id"] == buy_exchange["id"]:
                 continue
-            deal = _match_asks_bids(a["asks"], b["bids"])
-            deal["ts"] = str(datetime.now())
-            deal["symbol"] = a["symbol"]
-            deal["buy"]["name"] = a["name"]
-            deal["sell"]["name"] = b["name"]
+            deal = _match_asks_bids(
+                balance=balance, symbol=buy_exchange["symbol"], buy_name=buy_exchange["name"], buy_asks=buy_exchange["asks"], sell_name=sell_exchange["name"], sell_bids=sell_exchange["bids"])
             deals += [deal]
 
-            deal = _match_asks_bids(b["asks"], a["bids"])
-            deal["ts"] = str(datetime.now())
-            deal["symbol"] = a["symbol"]
-            deal["buy"]["name"] = b["name"]
-            deal["sell"]["name"] = a["name"]
-            deals += [deal]
     return [deal for deal in deals if deal["potential_profit"] > 3]
 
 
-def _match_asks_bids(buy_asks, sell_bids):
+def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
+    base_coin, quote_coin = symbol.split('/')
+
     buy_index = 0
     sell_index = 0
-    total_amount = 0
-    potential_profit = 0.0
-
-    sell_bids = sorted(sell_bids, key=lambda x: x[0], reverse=True)
 
     buy_price_max = buy_price_min = buy_asks[buy_index][0]
     sell_price_max = sell_price_min = sell_bids[sell_index][0]
@@ -47,51 +38,62 @@ def _match_asks_bids(buy_asks, sell_bids):
     buy_total = 0
     sell_total = 0
 
-    while buy_index < len(buy_asks) and sell_index < len(sell_bids):
+    while balance[quote_coin] > 0 and buy_index < len(buy_asks) and sell_index < len(sell_bids):
         buy_price = buy_asks[buy_index][0]
-        buy_amount = buy_asks[buy_index][1]
+        buy_amount_base = buy_asks[buy_index][1]
+        buy_amount_quote = buy_price * buy_amount_base
         sell_price = sell_bids[sell_index][0]
-        sell_amount = sell_bids[sell_index][1]
+        sell_amount_base = sell_bids[sell_index][1]
+        sell_amount_quote = sell_price * sell_amount_base
+        current_balance_quote = balance[quote_coin]
 
         # Ensure buy price is less than or equal to sell price for a match
-        if buy_price <= sell_price:
+        if buy_price < sell_price:
             buy_price_min = min(buy_price_min, buy_price)
             buy_price_max = max(buy_price_max, buy_price)
 
             sell_price_min = min(sell_price_min, sell_price)
             sell_price_max = max(sell_price_max, sell_price)
 
-            matched_amount = min(buy_amount, sell_amount)
-            buy_total += matched_amount * buy_price
-            sell_total += matched_amount * sell_price
-            total_amount += matched_amount
-            potential_profit += matched_amount * (sell_price - buy_price)
+            matched_amount_quote = min(
+                buy_amount_quote, sell_amount_quote, current_balance_quote)
 
-            buy_orders += [buy_price, matched_amount]
-            sell_orders += [sell_price, matched_amount]
+            if matched_amount_quote > 0:
+                matched_amount_base = matched_amount_quote / buy_price
+                buy_orders += [buy_price, matched_amount_base]
+                sell_orders += [sell_price, matched_amount_base]
 
-            # Update the amounts
-            buy_asks[buy_index][1] -= matched_amount
-            sell_bids[sell_index][1] -= matched_amount
+                buy_total += matched_amount_quote
+                sell_total += (matched_amount_base * sell_price)
+
+                # Update the amounts
+                buy_asks[buy_index][1] -= matched_amount_base
+                sell_bids[sell_index][1] -= matched_amount_base
+                balance[quote_coin] -= matched_amount_quote
+                if base_coin not in balance:
+                    balance[base_coin] = 0
+                balance[base_coin] += matched_amount_base
 
             # Remove orders that are fully matched
-            if buy_asks[buy_index][1] == 0:
+            if buy_asks[buy_index][1] <= 0:
                 buy_index += 1
-            if sell_bids[sell_index][1] == 0:
+            if sell_bids[sell_index][1] <= 0:
                 sell_index += 1
         else:
             # If the prices don't match, exit the loop
             break
 
     return {
-        "total_amount": total_amount,
-        "potential_profit": potential_profit,
+        "potential_profit": (sell_total - buy_total),
+        "symbol": symbol,
         "buy": {
+            "name": buy_name,
             "orders": buy_orders,
             "price": {"min": buy_price_min, "max": buy_price_max},
             "total": buy_total,
         },
         "sell": {
+            "name": sell_name,
             "orders": sell_orders,
             "price": {"min": sell_price_min, "max": sell_price_max},
             "total": sell_total,
@@ -127,8 +129,8 @@ def _print_book_orders(book_orders):
             f"{book_order['name']}{' ' * (4 + len(table_asks[0]) + len(table_bids[0]) - len(book_order['name']))}\n{red_color}ASKS{no_color}{' ' * len(table_asks[0])}{green_color}BIDS{no_color}{' ' * (len(table_bids[0])-4)}\n"
             + "\n".join(
                 [
-                    f"{red_color}{b}{no_color}    {green_color}{a}{no_color}"
-                    for b, a in zip(table_bids, table_asks)
+                    f"{red_color}{asks}{no_color}    {green_color}{bids}{no_color}"
+                    for bids, asks in zip(table_bids, table_asks)
                 ]
             )
         )
@@ -149,99 +151,108 @@ def _print_deals(deals):
                 [
                     deal["ts"],
                     deal["symbol"],
+                    deal["buy"]["name"],
                     deal["buy"]["total"],
+                    deal["sell"]["name"],
                     deal["sell"]["total"],
                     deal["potential_profit"],
-                    deal["buy"]["name"],
-                    deal["sell"]["name"],
                 ]
                 for deal in deals
             ],
             headers=(
                 "Timestamp",
                 "Symbol",
+                "Buy Exchange",
                 "Total Buy",
+                "Sell Exchange",
                 "Total Sell",
                 "Potential Profit",
-                "Buy Exchange",
-                "Sell Exchange",
             ),
             floatfmt=".8f",
         )
     )
 
 
+common_to_exchange = {
+    "kucoin": {
+        "GALA/USDT": "GALAX/USDT",
+    }
+}
+
+exchange_to_common = {
+    "kucoin": {
+        "GALAX/USDT": "GALA/USDT",
+    }
+}
+
 def _common_symbol_to_exchange(symbol, exchange_id):
-    if symbol == "GALA/USDT" and exchange_id == "kucoin":
-        return "GALAX/USDT"
+    if common_to_exchange.get(exchange_id) is not None and common_to_exchange.get(exchange_id).get(symbol) is not None:
+        return common_to_exchange[exchange_id][symbol]
     return symbol
 
 
 def _exchange_symbol_to_common(symbol, exchange_id):
-    if symbol == "GALAX/USDT" and exchange_id == "kucoin":
-        return "GALA/USDT"
+    if exchange_to_common.get(exchange_id) is not None and exchange_to_common.get(exchange_id).get(symbol) is not None:
+        return exchange_to_common[exchange_id][symbol]
     return symbol
 
+book_orders_per_symbol = {}
+deals = []
+
+async def _watch_book_order(client, symbol):
+    global book_orders_per_symbol
+    while True:
+        try:
+            book_order = await client.watch_order_book(symbol)
+        except Exception:
+            await asyncio.sleep(1)
+            continue
+        book_order["id"] = client.id
+        book_order["name"] = client.name
+        if symbol not in book_orders_per_symbol:
+            book_orders_per_symbol[symbol] = {}
+        book_orders_per_symbol[symbol][client.id] = book_order
+        _process_book_orders()
+        await asyncio.sleep(1)
+
+
+def _process_book_orders():
+    global deals
+    os.system("cls" if os.name == "nt" else "clear")
+    for symbol, data in book_orders_per_symbol.items():
+        book_orders = []
+        for client_id, book_order in data.items():
+            book_orders += [book_order]
+        _print_book_orders(book_orders)
+        if len(book_orders) > 1:
+            deals += _match_book_orders(book_orders)
+    while len(deals) > 30:
+        deals = deals[1:]
+
+    print()
+    _print_deals(deals)
 
 async def _run():
-    binance_client = ccxt.binance()
-    bitget_client = ccxt.bitget()
-    kucoin_client = ccxt.kucoin()
-    gateio_client = ccxt.gateio()
-    poloniex_client = ccxt.poloniex()
     clients = [
-        binance_client,
-        bitget_client,
-        kucoin_client,
-        gateio_client,
-        poloniex_client,
+        ccxt.binance(),
+        ccxt.bitget(),
+        ccxt.kucoin(),
+        ccxt.gateio(),
+        ccxt.mexc(),
     ]
 
-    symbols = ["GALA/USDT", "BTC/USDT", "ETH/USDT", "XRP/USDT", "LTC/USDT"]
+    for client in clients:
+        await client.load_markets()
+
+    symbols = ["LTC/USDT"]
     try:
-        deals = []
-        while True:
-            book_orders_per_symbol = []
-            tasks = []
-            for symbol in symbols:
-                for client in clients:
-
-                    async def _fetch_book_order(client, symbol):
-                        book_order = await client.watch_order_book(symbol)
-                        return {
-                            "id": client.id,
-                            "name": client.name,
-                            "symbol": symbol,
-                            "asks": book_order["asks"],
-                            "bids": book_order["bids"],
-                        }
-
-                    tasks += [
-                        asyncio.create_task(
-                            _fetch_book_order(
-                                client, _common_symbol_to_exchange(symbol, client.id)
-                            )
-                        )
-                    ]
-            book_orders = await asyncio.gather(*tasks)
-            book_orders_per_symbol = []
-            for symbol, orders in itertools.groupby(
-                book_orders,
-                key=lambda x: _exchange_symbol_to_common(x["symbol"], x["id"]),
-            ):
-                book_orders_per_symbol += [list(orders)]
-
-            os.system("cls" if os.name == "nt" else "clear")
-            for book_orders in book_orders_per_symbol:
-                _print_book_orders(book_orders)
-                deals += _match_book_orders(book_orders)
-            while len(deals) > 30:
-                deals = deals[1:]
-
-            print()
-            _print_deals(deals)
-
-            await asyncio.sleep(1)
+        tasks = []
+        for symbol in symbols:
+            for client in clients:
+                tasks += [_watch_book_order(
+                    client, _common_symbol_to_exchange(symbol, client.id)
+                )]
+        await asyncio.gather(*tasks)
     except KeyboardInterrupt:
         pass
     finally:
