@@ -1,6 +1,5 @@
 import asyncio
 import os
-from datetime import datetime
 
 import ccxt.pro as ccxt
 import tabulate
@@ -10,21 +9,27 @@ from dotenv import load_dotenv
 def _match_book_orders(book_orders):
     deals = []
     balance = {
-        'USDT': 1000.0,
+        "USDT": 1000.0,
     }
     for buy_exchange in book_orders:
         for sell_exchange in book_orders:
             if sell_exchange["id"] == buy_exchange["id"]:
                 continue
             deal = _match_asks_bids(
-                balance=balance, symbol=buy_exchange["symbol"], buy_name=buy_exchange["name"], buy_asks=buy_exchange["asks"], sell_name=sell_exchange["name"], sell_bids=sell_exchange["bids"])
+                balance=balance,
+                symbol=buy_exchange["symbol"],
+                buy_name=buy_exchange["name"],
+                buy_asks=buy_exchange["asks"],
+                sell_name=sell_exchange["name"],
+                sell_bids=sell_exchange["bids"],
+            )
             deals += [deal]
 
     return [deal for deal in deals if deal["potential_profit"] > 3]
 
 
 def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
-    base_coin, quote_coin = symbol.split('/')
+    base_coin, quote_coin = symbol.split("/")
 
     buy_index = 0
     sell_index = 0
@@ -38,7 +43,11 @@ def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
     buy_total = 0
     sell_total = 0
 
-    while balance[quote_coin] > 0 and buy_index < len(buy_asks) and sell_index < len(sell_bids):
+    while (
+        balance[quote_coin] > 0
+        and buy_index < len(buy_asks)
+        and sell_index < len(sell_bids)
+    ):
         buy_price = buy_asks[buy_index][0]
         buy_amount_base = buy_asks[buy_index][1]
         buy_amount_quote = buy_price * buy_amount_base
@@ -56,7 +65,8 @@ def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
             sell_price_max = max(sell_price_max, sell_price)
 
             matched_amount_quote = min(
-                buy_amount_quote, sell_amount_quote, current_balance_quote)
+                buy_amount_quote, sell_amount_quote, current_balance_quote
+            )
 
             if matched_amount_quote > 0:
                 matched_amount_base = matched_amount_quote / buy_price
@@ -64,7 +74,7 @@ def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
                 sell_orders += [sell_price, matched_amount_base]
 
                 buy_total += matched_amount_quote
-                sell_total += (matched_amount_base * sell_price)
+                sell_total += matched_amount_base * sell_price
 
                 # Update the amounts
                 buy_asks[buy_index][1] -= matched_amount_base
@@ -188,19 +198,28 @@ exchange_to_common = {
     }
 }
 
+
 def _common_symbol_to_exchange(symbol, exchange_id):
-    if common_to_exchange.get(exchange_id) is not None and common_to_exchange.get(exchange_id).get(symbol) is not None:
+    if (
+        common_to_exchange.get(exchange_id) is not None
+        and common_to_exchange.get(exchange_id).get(symbol) is not None
+    ):
         return common_to_exchange[exchange_id][symbol]
     return symbol
 
 
 def _exchange_symbol_to_common(symbol, exchange_id):
-    if exchange_to_common.get(exchange_id) is not None and exchange_to_common.get(exchange_id).get(symbol) is not None:
+    if (
+        exchange_to_common.get(exchange_id) is not None
+        and exchange_to_common.get(exchange_id).get(symbol) is not None
+    ):
         return exchange_to_common[exchange_id][symbol]
     return symbol
 
+
 book_orders_per_symbol = {}
 deals = []
+
 
 async def _watch_book_order(client, symbol):
     global book_orders_per_symbol
@@ -233,6 +252,7 @@ def _process_book_orders():
     print()
     _print_deals(deals)
 
+
 async def _run():
     clients = [
         ccxt.binance(),
@@ -250,9 +270,11 @@ async def _run():
         tasks = []
         for symbol in symbols:
             for client in clients:
-                tasks += [_watch_book_order(
-                    client, _common_symbol_to_exchange(symbol, client.id)
-                )]
+                tasks += [
+                    _watch_book_order(
+                        client, _common_symbol_to_exchange(symbol, client.id)
+                    )
+                ]
         await asyncio.gather(*tasks)
     except KeyboardInterrupt:
         pass
