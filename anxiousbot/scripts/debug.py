@@ -270,11 +270,10 @@ async def _run():
         tasks = []
         for symbol in symbols:
             for client in clients:
-                tasks += [
-                    _watch_book_order(
-                        client, _common_symbol_to_exchange(symbol, client.id)
-                    )
-                ]
+                esymbol = _common_symbol_to_exchange(symbol, client.id)
+                if esymbol not in client.markets.keys():
+                    continue
+                tasks += [_watch_book_order(client, esymbol)]
         await asyncio.gather(*tasks)
     except KeyboardInterrupt:
         pass
