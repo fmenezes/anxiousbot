@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import datetime
 
 import ccxt.pro as ccxt
 import tabulate
@@ -25,7 +26,7 @@ def _match_book_orders(book_orders):
             )
             deals += [deal]
 
-    return [deal for deal in deals if deal["potential_profit"] > 3]
+    return [deal for deal in deals if deal["potential_profit"] > 0]
 
 
 def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
@@ -40,8 +41,9 @@ def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
     buy_orders = []
     sell_orders = []
 
-    buy_total = 0
-    sell_total = 0
+    buy_total_quote = 0
+    buy_total_base = 0
+    sell_total_quote = 0
 
     while (
         balance[quote_coin] > 0
@@ -73,8 +75,9 @@ def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
                 buy_orders += [buy_price, matched_amount_base]
                 sell_orders += [sell_price, matched_amount_base]
 
-                buy_total += matched_amount_quote
-                sell_total += matched_amount_base * sell_price
+                buy_total_base += matched_amount_base
+                buy_total_quote += matched_amount_quote
+                sell_total_quote += matched_amount_base * sell_price
 
                 # Update the amounts
                 buy_asks[buy_index][1] -= matched_amount_base
@@ -94,19 +97,22 @@ def _match_asks_bids(balance, symbol, buy_name, buy_asks, sell_name, sell_bids):
             break
 
     return {
-        "potential_profit": (sell_total - buy_total),
+        "ts": str(datetime.now()),
+        "potential_profit": (sell_total_quote - buy_total_quote),
         "symbol": symbol,
         "buy": {
             "name": buy_name,
             "orders": buy_orders,
             "price": {"min": buy_price_min, "max": buy_price_max},
-            "total": buy_total,
+            "total_quote": buy_total_quote,
+            "total_base": buy_total_base,
         },
         "sell": {
             "name": sell_name,
             "orders": sell_orders,
             "price": {"min": sell_price_min, "max": sell_price_max},
-            "total": sell_total,
+            "total_quote": sell_total_quote,
+            "total_base": buy_total_base,
         },
     }
 
@@ -165,9 +171,11 @@ def _print_deals(deals):
                     deal["ts"],
                     deal["symbol"],
                     deal["buy"]["name"],
-                    deal["buy"]["total"],
+                    deal["buy"]["total_base"],
+                    deal["buy"]["total_quote"],
                     deal["sell"]["name"],
-                    deal["sell"]["total"],
+                    deal["sell"]["total_base"],
+                    deal["sell"]["total_quote"],
                     deal["potential_profit"],
                 ]
                 for deal in deals
@@ -176,9 +184,11 @@ def _print_deals(deals):
                 "Timestamp",
                 "Symbol",
                 "Buy Exchange",
-                "Total Buy",
+                "Total Buy (Base)",
+                "Total Buy (Quote)",
                 "Sell Exchange",
-                "Total Sell",
+                "Total Sell (Base)",
+                "Total Sell (Quote)",
                 "Potential Profit",
             ),
             floatfmt=".8f",
@@ -265,7 +275,7 @@ async def _run():
     for client in clients:
         await client.load_markets()
 
-    symbols = ["BTC/USDT"]
+    symbols = ["SOPH/USDT"]
     try:
         tasks = []
         for symbol in symbols:
