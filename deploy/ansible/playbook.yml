@@ -86,7 +86,6 @@
               }
             },
             "logs": {
-              "logs": {
               "logs_collected": {
                 "files": {
                   "collect_list": [
@@ -102,7 +101,6 @@
               "log_stream_name": "anxiousbot_log_stream"
             }
           }
-
     - name: Clone the GitHub repository
       git:
         repo: 'https://{{ github_token }}@github.com/fmenezes/anxiousbot.git'
