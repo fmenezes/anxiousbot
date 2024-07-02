@@ -198,7 +198,7 @@ def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sel
 async def _watch_deals(symbol, clients):
     try:
         file_name = os.path.abspath(
-            f"data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime("%Y-%m-%d")}.csv"
+            f"data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime('%Y-%m-%d')}.csv"
         )
         if not os.path.exists(file_name):
             with open(file_name, "w") as f:
