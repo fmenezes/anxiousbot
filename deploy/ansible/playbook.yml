@@ -14,14 +14,30 @@
         name: '*'
         state: latest
 
-    - name: Install CloudWatch Agent
+    - name: Install required system packages
       yum:
-        name: amazon-cloudwatch-agent
-        state: present
+        name:
+          - git
+          - python3.11
+          - python3.11-pip
+          - amazon-cloudwatch-agent
+        state: latest
+
+    - name: Install Poetry
+      pip:
+        name: poetry
+        executable: pip3.11
+        extra_args: --ignore-installed
 
     - name: Create CloudWatch Agent configuration directory
       file:
         path: /opt/aws/amazon-cloudwatch-agent/etc
+        state: directory
+        mode: '0755'
+
+    - name: Create logs directory
+      file:
+        path: /var/log/anxiousbot
         state: directory
         mode: '0755'
 
@@ -87,26 +103,6 @@
             }
           }
 
-    - name: Enable and start CloudWatch Agent service
-      systemd:
-        name: amazon-cloudwatch-agent
-        enabled: yes
-        state: started
-
-    - name: Install required system packages
-      yum:
-        name:
-          - git
-          - python3
-          - python3-pip
-        state: present
-
-    - name: Install Poetry
-      pip:
-        name: poetry
-        executable: pip3
-        extra_args: --ignore-installed
-
     - name: Clone the GitHub repository
       git:
         repo: 'https://{{ github_token }}@github.com/fmenezes/anxiousbot.git'
@@ -127,7 +123,17 @@
         group: root
         mode: 0644
 
-    - name: Start Anxiousbot Service
+    - name: reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start CloudWatch Agent service
+      systemd:
+        name: amazon-cloudwatch-agent
+        enabled: yes
+        state: started
+
+    - name: Enable and start Anxiousbot Service
       systemd:
         name: anxiousbot
         state: started
