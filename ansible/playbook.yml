@@ -2,8 +2,9 @@
 - name: Configure EC2 instances
   hosts: tag_Project_anxiousbot
   become: yes
-  vars:
-    ansible_user: ec2-user
+  vars_files:
+    - vars/secrets.yml
+
   tasks:
     - name: Ping EC2 instances
       ping:
@@ -73,25 +74,46 @@
                 "files": {
                   "collect_list": [
                     {
-                      "file_path": "/var/log/messages",
+                      "file_path": "/var/log/anxiousbot",
                       "log_group_name": "anxiousbot-logs",
                       "log_stream_name": "{instance_id}-messages",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/secure",
-                      "log_group_name": "anxiousbot-logs",
-                      "log_stream_name": "{instance_id}-secure",
                       "timezone": "UTC"
                     }
                   ]
                 }
               },
-              "log_stream_name": "my_log_stream_name"
+              "log_stream_name": "anxiousbot_log_stream"
             }
           }
 
-    - name: Start CloudWatch Agent
-      command: /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+    - name: Enable and start CloudWatch Agent service
+      systemd:
+        name: amazon-cloudwatch-agent
+        enabled: yes
+        state: started
+
+    - name: Install required system packages
+      yum:
+        name:
+          - git
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Install Poetry
+      pip:
+        name: poetry
+        executable: pip3
+        extra_args: --ignore-installed
+
+    - name: Clone the GitHub repository
+      git:
+        repo: 'https://{{ github_token }}@github.com/fmenezes/anxiousbot.git'
+        dest: /opt/anxiousbot
+
+    - name: Install dependencies with Poetry
+      shell: |
+        cd /opt/anxiousbot
+        poetry install
       args:
-        creates: /opt/aws/amazon-cloudwatch-agent/var/amazon-cloudwatch-agent.log
+        executable: /bin/bash
