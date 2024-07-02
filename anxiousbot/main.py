@@ -1,27 +1,37 @@
 import asyncio
-import traceback
-import sys
+import logging
 import os
 from datetime import datetime
 
 import ccxt.pro as ccxt
-from ccxt.base.exchange import ExchangeError, ExchangeNotAvailable
 from ccxt.base.errors import PermissionDenied
+from ccxt.base.exchange import ExchangeError, ExchangeNotAvailable
 from dotenv import load_dotenv
-import logging
+from pythonjsonlogger import jsonlogger
 
-logging.basicConfig(stream=sys.stderr, level=logging.INFO, format='{"level":"%(levelname)s","name":"%(name)s","message":"%(message)s"}')
+
+class CustomJsonFormatter(jsonlogger.JsonFormatter):
+    def add_fields(self, log_record, record, message_dict):
+        super().add_fields(log_record, record, message_dict)
+        # Add numeric log level
+        log_record["level"] = record.levelname
+
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = CustomJsonFormatter(timestamp=True)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
-data = {
-    "/balance/USDT": 100000.0
-}
+data = {"/balance/USDT": 100000.0}
 
 common_to_exchange = {
     "kucoin": {
         "GALA/USDT": "GALAX/USDT",
     }
 }
+
 
 def _common_symbol_to_exchange(symbol, exchange_id):
     if (
@@ -30,6 +40,7 @@ def _common_symbol_to_exchange(symbol, exchange_id):
     ):
         return common_to_exchange[exchange_id][symbol]
     return symbol
+
 
 async def _watch_book_order(client_id, symbol):
     client = getattr(ccxt, client_id)()
@@ -41,45 +52,60 @@ async def _watch_book_order(client_id, symbol):
                 await client.load_markets()
                 break
             except PermissionDenied as e:
-                logger.info(f"skipping {client_id}, permission denied")
+                logger.info(
+                    f"skipping {client_id}, permission denied",
+                    extra={"exchange": client_id, "symbol": symbol},
+                )
                 return
             except ExchangeNotAvailable as e:
-                logger.info(f"skipping {client_id}, exchange not available")
+                logger.info(
+                    f"skipping {client_id}, exchange not available",
+                    extra={"exchange": client_id, "symbol": symbol},
+                )
                 return
             except Exception as e:
-                logger.error(f"error: [{type(e).__name__}] {str(e)}")
-                logger.error(traceback.format_exc())
-                logger.info('retrying...')
+                logger.error(e)
+                logger.info("retrying...")
                 await asyncio.sleep(0.5)
         if client.markets.get(esymbol) is None:
-            logger.info(f"skipping {client_id}, does not support {symbol}")
+            logger.info(
+                f"skipping {client_id}, does not support {symbol}",
+                extra={"exchange": client_id, "symbol": symbol},
+            )
             return
-        logger.info(f"loaded markets for {client_id}")
+        logger.info(
+            f"loaded markets for {client_id}",
+            extra={"exchange": client_id, "symbol": symbol},
+        )
         while True:
             try:
                 start = datetime.now()
-                logger.info(f"loading book orders for {client_id}")
+                logger.info(
+                    f"loading book orders for {client_id}",
+                    extra={"exchange": client_id, "symbol": symbol},
+                )
                 book_order = await client.watch_order_book(esymbol)
                 end = datetime.now()
-                logger.info(f"loaded book orders for {client_id} in {(end - start)}")
+                logger.info(
+                    f"loaded book orders for {client_id} in {(end - start)}",
+                    extra={"exchange": client_id, "symbol": symbol},
+                )
             except ExchangeError as e:
-                logger.error(f"error: [{type(e).__name__}] {str(e)}")
-                logger.error(traceback.format_exc())
+                logger.error(e)
                 break
             except Exception as e:
-                logger.error(f"error: [{type(e).__name__}] {str(e)}")
-                logger.error(traceback.format_exc())
-                logger.info('retrying...')
+                logger.error(e)
+                logger.info("retrying...")
                 await asyncio.sleep(1)
                 continue
-            data[f'/asks/{symbol}/{client_id}'] = book_order['asks']
-            data[f'/bids/{symbol}/{client_id}'] = book_order['bids']
+            data[f"/asks/{symbol}/{client_id}"] = book_order["asks"]
+            data[f"/bids/{symbol}/{client_id}"] = book_order["bids"]
             await asyncio.sleep(1)
     except Exception as e:
-        logger.error(f"error: [{type(e).__name__}] {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(e)
     finally:
         await client.close()
+
 
 def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids):
     base_coin, quote_coin = symbol.split("/")
@@ -168,58 +194,82 @@ def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sel
         },
     }
 
+
 async def _watch_deals(symbol, clients):
     try:
-        file_name = os.path.abspath(f'data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime("%Y-%m-%d")}.csv')
+        file_name = os.path.abspath(
+            f'data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime("%Y-%m-%d")}.csv'
+        )
         if not os.path.exists(file_name):
-            with open(file_name, 'w') as f:
-                f.write('ts,symbol,profit,buy_exchange,buy_total_base,buy_total_quote,sell_exchange,sell_total_base,sell_total_quote\n')
+            with open(file_name, "w") as f:
+                f.write(
+                    "ts,symbol,profit,buy_exchange,buy_total_base,buy_total_quote,sell_exchange,sell_total_base,sell_total_quote\n"
+                )
         while True:
-            logger.info(f'checking deals {symbol}...')
+            logger.info(f"checking deals {symbol}...", extra={"symbol": symbol})
             base_coin, quote_coin = symbol.split("/")
             balance = {
                 base_coin: data.get(f"/balance/{base_coin}", 0.0),
-                quote_coin: data.get(f"/balance/{quote_coin}", 0.0)
+                quote_coin: data.get(f"/balance/{quote_coin}", 0.0),
             }
 
             deals = []
-            for buy_cilent_id, sell_client_id in [(a, b) for a in clients for b in clients if a != b]:
+            for buy_cilent_id, sell_client_id in [
+                (a, b) for a in clients for b in clients if a != b
+            ]:
                 asks = data.get(f"/asks/{symbol}/{buy_cilent_id}")
                 bids = data.get(f"/bids/{symbol}/{sell_client_id}")
                 if asks is None:
                     continue
                 if bids is None:
                     continue
-                deals += [_match_asks_bids(balance, symbol, buy_cilent_id, asks, sell_client_id, bids)]
-            deals = [deal for deal in deals if deal['profit'] > 0]
-            logger.info(f'found {len(deals)} deals')
+                deals += [
+                    _match_asks_bids(
+                        balance, symbol, buy_cilent_id, asks, sell_client_id, bids
+                    )
+                ]
+            deals = [deal for deal in deals if deal["profit"] > 0]
+            logger.info(f"found {len(deals)} deals", extra={"symbol": symbol})
             if len(deals) > 0:
-                with open(file_name, 'a') as f:
-                    rows = [[datetime.now(),deal['symbol'],deal['profit'],deal['buy']['exchange'],deal['buy']['total_base'],deal['buy']['total_quote'],deal['sell']['exchange'],deal['sell']['total_base'],deal['sell']['total_quote']] for deal in deals]
-                    rows = [','.join([str(col) for col in row]) for row in rows]
-                    f.write('\n'.join(rows) + '\n')
+                with open(file_name, "a") as f:
+                    rows = [
+                        [
+                            datetime.now(),
+                            deal["symbol"],
+                            deal["profit"],
+                            deal["buy"]["exchange"],
+                            deal["buy"]["total_base"],
+                            deal["buy"]["total_quote"],
+                            deal["sell"]["exchange"],
+                            deal["sell"]["total_base"],
+                            deal["sell"]["total_quote"],
+                        ]
+                        for deal in deals
+                    ]
+                    rows = [",".join([str(col) for col in row]) for row in rows]
+                    f.write("\n".join(rows) + "\n")
             await asyncio.sleep(0.5)
 
     except Exception as e:
-        logger.error(f"error: [{type(e).__name__}] {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(e)
 
 
-async def _run():
-    clients = ccxt.exchanges
-
-    symbols = ["SOPH/USDT"]
+async def _run(symbols, exchanges):
     tasks = []
     for symbol in symbols:
-        tasks += [_watch_deals(symbol, clients)]
-        for client_id in clients:
+        tasks += [_watch_deals(symbol, exchanges)]
+        for client_id in exchanges:
             tasks += [_watch_book_order(client_id, symbol)]
     await asyncio.gather(*tasks)
 
 
 def _main():
     load_dotenv(override=True)
-    asyncio.run(_run())
+    symbols = os.getenv("SYMBOLS", "BTC/USDT")
+    symbols = symbols.split(",")
+    exchanges = os.getenv("EXCHANGES", ",".join(ccxt.exchanges))
+    exchanges = exchanges.split(",")
+    asyncio.run(_run(symbols, exchanges))
 
 
 if __name__ == "__main__":
