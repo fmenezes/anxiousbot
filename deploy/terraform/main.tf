@@ -148,8 +148,15 @@ resource "aws_instance" "server" {
   key_name                    = "filipe"
   iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
 
+  user_data = <<-EOF
+    #!/bin/bash
+    echo 'export SYMBOLS="BTC/USDT"' >> /etc/profile.d/anxiousbot.sh
+    echo 'export EXCHANGES="whitebit,exmo,mexc,bingx,bitmex,htx,bitcoincom,woo,coinbase,lbank,hollaex,gate,currencycom,upbit,bitstamp,bitrue,deribit,phemex,cex,bitfinex,kraken,probit,ascendex,bybit,bitget,kucoin,luno,gemini,blockchaincom,coinex,hitbtc,huobi,binance,bitopro,bitmart,bitfinex2,ndax,poloniex,wazirx,coinbaseexchange,gateio,binanceus,bequant,p2b,cryptocom,okx"' >> /etc/profile.d/anxiousbot.sh
+    source /etc/profile.d/anxiousbot.sh
+  EOF
+
   tags = {
-    Name    = "anxiousbot-server"
+    Name    = "anxiousbot-server-BTC/USDT"
     Project = "anxiousbot"
   }
 }
