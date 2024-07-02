@@ -1,0 +1,18 @@
+[Unit]
+Description=Anxiousbot Service
+After=network.target
+
+[Service]
+User=root
+Group=root
+WorkingDirectory=/opt/anxiousbot
+Environment="PATH=/opt/poetry/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/opt/poetry/bin/poetry run start
+Restart=always
+RestartSec=5s
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=anxiousbot
+
+[Install]
+WantedBy=multi-user.target
