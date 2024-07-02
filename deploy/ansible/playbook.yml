@@ -18,15 +18,15 @@
       yum:
         name:
           - git
-          - python3.11
-          - python3.11-pip
+          - python3
+          - python3-pip
           - amazon-cloudwatch-agent
         state: latest
 
     - name: Install Poetry
       pip:
         name: poetry
-        executable: pip3.11
+        executable: pip3
         extra_args: --ignore-installed
 
     - name: Create CloudWatch Agent configuration directory
