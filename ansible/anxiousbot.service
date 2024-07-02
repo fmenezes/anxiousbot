@@ -6,7 +6,6 @@ After=network.target
 User=root
 Group=root
 WorkingDirectory=/opt/anxiousbot
-Environment="PATH=/opt/poetry/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/usr/local/bin/poetry run start
 Restart=always
 RestartSec=5s
