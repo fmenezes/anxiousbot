@@ -9,9 +9,8 @@ WorkingDirectory=/opt/anxiousbot
 ExecStart=/usr/local/bin/poetry run start
 Restart=always
 RestartSec=5s
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=anxiousbot
+StandardOutput=/var/log/anxiousbot/log.log
+StandardError=/var/log/anxiousbot/log_error.log
 
 [Install]
 WantedBy=multi-user.target
