@@ -9,6 +9,9 @@ resource "aws_s3_bucket" "main" {
     Name    = "anxiousbot-main-bucket"
     Project = "anxiousbot"
   }
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # VPC
@@ -157,6 +160,14 @@ resource "aws_iam_policy" "s3_bucket_access" {
     Statement = [
       {
         Action = [
+          "s3:ListBucket",
+        ]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.main.arn}"
+      },
+      {
+        Action = [
+          "s3:GetObject",
           "s3:PutObject",
           "s3:PutObjectAcl",
         ]
