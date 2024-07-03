@@ -43,10 +43,12 @@ def _group(csv_file_path, json_file_path):
         reader = csv.reader(f)
         first_row = None
         data = []
+        symbols = 0
         for row in reader:
             if first_row is None:
                 first_row = row
                 continue
+            symbols += 1
             record = {"exchanges": []}
             for i in range(0, len(first_row)):
                 if first_row[i] == "count":
@@ -60,8 +62,7 @@ def _group(csv_file_path, json_file_path):
             record["exchanges"] = list(set(record["exchanges"]))
             data += [record]
         data.sort(key=lambda x: x["count"], reverse=True)
-        data = [row for row in data if row["count"] > 1]
-        data = [row for row in data if ":" not in row["symbol"]]
+        data = [row for row in data if ":" not in row["symbol"] and row["count"] > 1 and row['symbol'].endswith("/USDT")]
         groups = []
         max_items = data[0]["count"]
         while len(data) > 0:
@@ -87,7 +88,7 @@ def _group(csv_file_path, json_file_path):
             groups += [group]
         with open(json_file_path, "w") as f:
             print(
-                json.dumps({"count": len(groups), "groups": groups}, indent=2), file=f
+                json.dumps({"stats": {"symbol_count": symbols, "group_count": len(groups)}, "groups": groups}, indent=2), file=f
             )
 
 

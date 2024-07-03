@@ -2,6 +2,15 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# S3 Bucket
+resource "aws_s3_bucket" "main" {
+  bucket = "anxiousbot-main-bucket"
+  tags = {
+    Name    = "anxiousbot-main-bucket"
+    Project = "anxiousbot"
+  }
+}
+
 # VPC
 resource "aws_vpc" "main" {
   cidr_block = "10.0.0.0/16"
@@ -138,6 +147,32 @@ resource "aws_iam_instance_profile" "ec2_instance_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
+# S3 Bucket Access Policy
+resource "aws_iam_policy" "s3_bucket_access" {
+  name        = "s3BucketAccessPolicy"
+  description = "Policy for allowing EC2 instance to upload to S3 bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "s3:PutObject",
+          "s3:PutObjectAcl",
+        ]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.main.arn}/*"
+      },
+    ]
+  })
+}
+
+# Attach S3 Access Policy to IAM Role
+resource "aws_iam_role_policy_attachment" "attach_s3_access_policy" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.s3_bucket_access.arn
+}
+
 # EC2 Instance
 resource "aws_instance" "server" {
   ami                         = "ami-01b799c439fd5516a"
@@ -150,6 +185,7 @@ resource "aws_instance" "server" {
 
   user_data = <<-EOF
     #!/bin/bash
+    echo 'export S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/profile.d/anxiousbot.sh
     echo 'export SYMBOLS="BTC/USDT"' >> /etc/profile.d/anxiousbot.sh
     echo 'export EXCHANGES="whitebit,exmo,mexc,bingx,bitmex,htx,bitcoincom,woo,coinbase,lbank,hollaex,gate,currencycom,upbit,bitstamp,bitrue,deribit,phemex,cex,bitfinex,kraken,probit,ascendex,bybit,bitget,kucoin,luno,gemini,blockchaincom,coinex,hitbtc,huobi,binance,bitopro,bitmart,bitfinex2,ndax,poloniex,wazirx,coinbaseexchange,gateio,binanceus,bequant,p2b,cryptocom,okx"' >> /etc/profile.d/anxiousbot.sh
     source /etc/profile.d/anxiousbot.sh

@@ -21,6 +21,7 @@
           - python3
           - python3-pip
           - amazon-cloudwatch-agent
+          - cronie
         state: latest
 
     - name: Install Poetry
@@ -136,3 +137,10 @@
         name: anxiousbot
         state: started
         enabled: yes
+
+    - name: Add cronjob
+      cron:
+        name: "Run script every hour"
+        minute: "0"
+        hour: "*"
+        job: "/opt/anxiousbot/deploy/ansible/s3sync.sh"
