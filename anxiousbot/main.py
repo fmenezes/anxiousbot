@@ -197,14 +197,6 @@ def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sel
 
 async def _watch_deals(symbol, clients):
     try:
-        file_name = os.path.abspath(
-            f"data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime('%Y-%m-%d')}.csv"
-        )
-        if not os.path.exists(file_name):
-            with open(file_name, "w") as f:
-                f.write(
-                    "ts,symbol,profit,buy_exchange,buy_total_base,buy_total_quote,sell_exchange,sell_total_base,sell_total_quote\n"
-                )
         while True:
             logger.info(f"checking deals {symbol}...", extra={"symbol": symbol})
             base_coin, quote_coin = symbol.split("/")
@@ -231,23 +223,31 @@ async def _watch_deals(symbol, clients):
             deals = [deal for deal in deals if deal["profit"] > 0]
             logger.info(f"found {len(deals)} deals", extra={"symbol": symbol})
             if len(deals) > 0:
+                file_name = os.path.abspath(
+                    f"data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime('%Y-%m-%d')}.csv"
+                )
+                print_header = not os.path.exists(file_name)
                 with open(file_name, "a") as f:
-                    rows = [
-                        [
-                            datetime.now(),
-                            deal["symbol"],
-                            deal["profit"],
-                            deal["buy"]["exchange"],
-                            deal["buy"]["total_base"],
-                            deal["buy"]["total_quote"],
-                            deal["sell"]["exchange"],
-                            deal["sell"]["total_base"],
-                            deal["sell"]["total_quote"],
-                        ]
-                        for deal in deals
-                    ]
-                    rows = [",".join([str(col) for col in row]) for row in rows]
-                    f.write("\n".join(rows) + "\n")
+                    if print_header:
+                        f.write(
+                            "ts,symbol,profit,buy_exchange,buy_total_base,buy_total_quote,sell_exchange,sell_total_base,sell_total_quote\n"
+                        )
+                    for deal in deals:
+                        row = [
+                                datetime.now(),
+                                deal["symbol"],
+                                deal["profit"],
+                                deal["buy"]["exchange"],
+                                deal["buy"]["total_base"],
+                                deal["buy"]["total_quote"],
+                                deal["sell"]["exchange"],
+                                deal["sell"]["total_base"],
+                                deal["sell"]["total_quote"],
+                            ]
+                        row = [str(col) for col in row]
+                        f.write(row + "\n")
+                        base_coin, quote_coin = deal["symbol"].split("/")
+                        logger.info(f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}', extra={"type":"deal","symbol":deal["symbol"],"exchange":deal["buy"]["exchange"],"sell_exchange":deal["sell"]["exchange"],"buy_quote":deal["buy"]["total_quote"],"buy_base":deal["buy"]["total_base"],"sell_quote":deal["sell"]["total_quote"],"profit":deal["profit"]})
             await asyncio.sleep(0.5)
 
     except Exception as e:
