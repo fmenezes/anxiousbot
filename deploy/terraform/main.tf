@@ -209,7 +209,6 @@ resource "aws_instance" "servers" {
   tags = {
     Name    = "anxiousbot-server-${count.index + 1}"
     Project = "anxiousbot"
-    Symbols = "${local.symbols[count.index]}"
   }
 }
 
