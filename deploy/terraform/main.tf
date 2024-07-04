@@ -2,6 +2,10 @@ provider "aws" {
   region = "us-east-1"
 }
 
+locals {
+  symbols = jsondecode(file("../../data/groups.json"))
+}
+
 # S3 Bucket
 resource "aws_s3_bucket" "main" {
   bucket = "anxiousbot-main-bucket"
@@ -185,7 +189,8 @@ resource "aws_iam_role_policy_attachment" "attach_s3_access_policy" {
 }
 
 # EC2 Instance
-resource "aws_instance" "server" {
+resource "aws_instance" "servers" {
+  count                       = length(local.symbols)
   ami                         = "ami-01b799c439fd5516a"
   instance_type               = "t2.small"
   subnet_id                   = aws_subnet.main.id
@@ -197,23 +202,23 @@ resource "aws_instance" "server" {
   user_data = <<-EOF
     #!/bin/bash
     echo 'export S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/profile.d/anxiousbot.sh
-    echo 'export SYMBOLS="BTC/USDT"' >> /etc/profile.d/anxiousbot.sh
-    echo 'export EXCHANGES="whitebit,exmo,mexc,bingx,bitmex,htx,bitcoincom,woo,coinbase,lbank,hollaex,gate,currencycom,upbit,bitstamp,bitrue,deribit,phemex,cex,bitfinex,kraken,probit,ascendex,bybit,bitget,kucoin,luno,gemini,blockchaincom,coinex,hitbtc,huobi,binance,bitopro,bitmart,bitfinex2,ndax,poloniex,wazirx,coinbaseexchange,gateio,binanceus,bequant,p2b,cryptocom,okx"' >> /etc/profile.d/anxiousbot.sh
+    echo 'export SYMBOLS="${local.symbols[count.index]}"' >> /etc/profile.d/anxiousbot.sh
     source /etc/profile.d/anxiousbot.sh
   EOF
 
   tags = {
-    Name    = "anxiousbot-server-BTC/USDT"
+    Name    = "anxiousbot-server-${count.index + 1}"
     Project = "anxiousbot"
+    Symbols = "${local.symbols[count.index]}"
   }
 }
 
-output "instance_id" {
-  description = "The ID of the EC2 instance"
-  value       = aws_instance.server.id
+output "instance_ids" {
+  description = "List of instance IDs"
+  value       = [for instance in aws_instance.servers : instance.id]
 }
 
-output "public_ip" {
-  description = "The public IP of the EC2 instance"
-  value       = aws_instance.server.public_ip
+output "public_ips" {
+  description = "List of public IP addresses"
+  value       = [for instance in aws_instance.servers : instance.public_ip]
 }
