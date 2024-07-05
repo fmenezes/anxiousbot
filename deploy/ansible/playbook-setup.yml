@@ -151,6 +151,12 @@
         group: root
         state: link
 
+    - name: add secrets to .env
+      ansible.builtin.lineinfile:
+        path: /opt/anxiousbot/.env
+        regexp: '^BOT_TOKEN='
+        line: BOT_TOKEN={{ bot_token }}
+
     - name: Enable and start CloudWatch Agent service
       systemd:
         name: amazon-cloudwatch-agent
