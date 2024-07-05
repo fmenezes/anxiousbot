@@ -1,4 +1,12 @@
 ---
+- name: Wait for EC2 instances
+  hosts: tag_Project_anxiousbot
+  gather_facts: no
+  tasks:
+    - name: Wait for ssh access
+      wait_for_connection:
+
+
 - name: Configure EC2 instances
   hosts: tag_Project_anxiousbot
   become: yes
