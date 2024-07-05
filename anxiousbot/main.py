@@ -64,7 +64,7 @@ async def _watch_book_order(client_id, symbol):
                 )
                 return
             except Exception as e:
-                logger.error(e)
+                logging.exception('An error occurred: ')
                 logger.debug("retrying...")
                 await asyncio.sleep(0.5)
         if client.markets.get(esymbol) is None:
@@ -91,10 +91,10 @@ async def _watch_book_order(client_id, symbol):
                     extra={"exchange": client_id, "symbol": symbol},
                 )
             except ExchangeError as e:
-                logger.error(e)
+                logging.exception('An error occurred: ')
                 break
             except Exception as e:
-                logger.error(e)
+                logging.exception('An error occurred: ')
                 logger.debug("retrying...")
                 await asyncio.sleep(1)
                 continue
@@ -102,7 +102,7 @@ async def _watch_book_order(client_id, symbol):
             data[f"/bids/{symbol}/{client_id}"] = book_order["bids"]
             await asyncio.sleep(1)
     except Exception as e:
-        logger.error(e)
+        logging.exception('An error occurred: ')
     finally:
         await client.close()
 
@@ -263,7 +263,7 @@ async def _watch_deals(symbol, clients):
             await asyncio.sleep(0.5)
 
     except Exception as e:
-        logger.error(e)
+        logging.exception('An error occurred: ')
 
 
 async def _run(symbols, exchanges):
@@ -287,7 +287,7 @@ def _main():
         logger.info(f"App exited")
     except Exception as e:
         logger.info(f"App exited with error")
-        logger.error(e)
+        logging.exception('An error occurred: ')
         raise e
 
 
