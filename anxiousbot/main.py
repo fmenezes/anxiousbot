@@ -46,7 +46,7 @@ async def _watch_book_order(client_id, symbol):
     client = getattr(ccxt, client_id)()
     esymbol = _common_symbol_to_exchange(symbol, client_id)
     try:
-        logger.info(f"loading markets for {client_id}")
+        logger.debug(f"loading markets for {client_id}")
         while True:
             try:
                 await client.load_markets()
@@ -65,7 +65,7 @@ async def _watch_book_order(client_id, symbol):
                 return
             except Exception as e:
                 logger.error(e)
-                logger.info("retrying...")
+                logger.debug("retrying...")
                 await asyncio.sleep(0.5)
         if client.markets.get(esymbol) is None:
             logger.info(
@@ -73,20 +73,20 @@ async def _watch_book_order(client_id, symbol):
                 extra={"exchange": client_id, "symbol": symbol},
             )
             return
-        logger.info(
+        logger.debug(
             f"loaded markets for {client_id}",
             extra={"exchange": client_id, "symbol": symbol},
         )
         while True:
             try:
                 start = datetime.now()
-                logger.info(
+                logger.debug(
                     f"loading book orders for {client_id}",
                     extra={"exchange": client_id, "symbol": symbol},
                 )
                 book_order = await client.watch_order_book(esymbol)
                 end = datetime.now()
-                logger.info(
+                logger.debug(
                     f"loaded book orders for {client_id} in {(end - start)}",
                     extra={"exchange": client_id, "symbol": symbol},
                 )
@@ -95,7 +95,7 @@ async def _watch_book_order(client_id, symbol):
                 break
             except Exception as e:
                 logger.error(e)
-                logger.info("retrying...")
+                logger.debug("retrying...")
                 await asyncio.sleep(1)
                 continue
             data[f"/asks/{symbol}/{client_id}"] = book_order["asks"]
@@ -198,7 +198,7 @@ def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sel
 async def _watch_deals(symbol, clients):
     try:
         while True:
-            logger.info(f"checking deals {symbol}...", extra={"symbol": symbol})
+            logger.debug(f"checking deals {symbol}...", extra={"symbol": symbol})
             base_coin, quote_coin = symbol.split("/")
             balance = {
                 base_coin: data.get(f"/balance/{base_coin}", 0.0),
@@ -221,7 +221,7 @@ async def _watch_deals(symbol, clients):
                     )
                 ]
             deals = [deal for deal in deals if deal["profit"] > 0]
-            logger.info(f"found {len(deals)} deals", extra={"symbol": symbol})
+            logger.debug(f"found {len(deals)} deals", extra={"symbol": symbol})
             if len(deals) > 0:
                 file_name = os.path.abspath(
                     f"data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime('%Y-%m-%d')}.csv"
@@ -281,7 +281,14 @@ def _main():
     symbols = symbols.split(",")
     exchanges = os.getenv("EXCHANGES", ",".join(ccxt.exchanges))
     exchanges = exchanges.split(",")
-    asyncio.run(_run(symbols, exchanges))
+    logger.info(f"App initialized with {symbols} and {exchanges} exchanges")
+    try:
+        asyncio.run(_run(symbols, exchanges))
+        logger.info(f"App exited")
+    except Exception as e:
+        logger.info(f"App exited with error")
+        logger.error(e)
+        raise e
 
 
 if __name__ == "__main__":

@@ -1,0 +1,22 @@
+---
+- name: Configure EC2 instances
+  hosts: tag_Project_anxiousbot
+  become: yes
+  vars_files:
+    - vars/secrets.yml
+
+  tasks:
+    - name: Ping EC2 instances
+      ping:
+
+    - name: Update code
+      git:
+        repo: 'https://{{ github_token }}@github.com/fmenezes/anxiousbot.git'
+        dest: /opt/anxiousbot
+        version: main
+        force: yes
+
+    - name: Restart Anxiousbot Service
+      systemd:
+        name: anxiousbot
+        state: restarted
