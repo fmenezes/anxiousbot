@@ -1,3 +1,4 @@
+from telegram import Bot
 import asyncio
 import logging
 import os
@@ -24,6 +25,8 @@ formatter = CustomJsonFormatter(timestamp=True)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
+bot = Bot(token=os.getenv('BOT_TOKEN'))
+chat_id = os.getenv('BOT_CHAT_ID')
 data = {"/balance/USDT": 100000.0}
 
 common_to_exchange = {
@@ -64,7 +67,7 @@ async def _watch_book_order(client_id, symbol):
                 )
                 return
             except Exception as e:
-                logging.exception('An error occurred: ')
+                logger.exception('An error occurred: ')
                 logger.debug("retrying...")
                 await asyncio.sleep(0.5)
         if client.markets.get(esymbol) is None:
@@ -91,10 +94,10 @@ async def _watch_book_order(client_id, symbol):
                     extra={"exchange": client_id, "symbol": symbol},
                 )
             except ExchangeError as e:
-                logging.exception('An error occurred: ')
+                logger.exception('An error occurred: ')
                 break
             except Exception as e:
-                logging.exception('An error occurred: ')
+                logger.exception('An error occurred: ')
                 logger.debug("retrying...")
                 await asyncio.sleep(1)
                 continue
@@ -102,7 +105,7 @@ async def _watch_book_order(client_id, symbol):
             data[f"/bids/{symbol}/{client_id}"] = book_order["bids"]
             await asyncio.sleep(1)
     except Exception as e:
-        logging.exception('An error occurred: ')
+        logger.exception('An error occurred: ')
     finally:
         await client.close()
 
@@ -195,7 +198,7 @@ def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sel
     }
 
 
-async def _watch_deals(symbol, clients):
+async def _watch_deals(symbol, clients, bot, chat_id):
     try:
         while True:
             logger.debug(f"checking deals {symbol}...", extra={"symbol": symbol})
@@ -247,8 +250,9 @@ async def _watch_deals(symbol, clients):
                         row = [str(col) for col in row]
                         f.write(row + "\n")
                         base_coin, quote_coin = deal["symbol"].split("/")
+                        deal_msg = f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}'
                         logger.info(
-                            f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}',
+                            deal_msg,
                             extra={
                                 "type": "deal",
                                 "symbol": deal["symbol"],
@@ -260,19 +264,25 @@ async def _watch_deals(symbol, clients):
                                 "profit": deal["profit"],
                             },
                         )
+                        try:
+                            bot.send_message(chat_id=chat_id, text=deal_msg)
+                        except Exception:
+                            logger.exception('An error occurred: ')
+
             await asyncio.sleep(0.5)
 
     except Exception as e:
-        logging.exception('An error occurred: ')
+        logger.exception('An error occurred: ')
 
 
-async def _run(symbols, exchanges):
-    tasks = []
-    for symbol in symbols:
-        tasks += [_watch_deals(symbol, exchanges)]
-        for client_id in exchanges:
-            tasks += [_watch_book_order(client_id, symbol)]
-    await asyncio.gather(*tasks)
+async def _run(symbols, exchanges, bot_token, bot_chat_id):
+    async with Bot(bot_token) as bot:
+        tasks = []
+        for symbol in symbols:
+            tasks += [_watch_deals(symbol, exchanges, bot, bot_chat_id)]
+            for client_id in exchanges:
+                tasks += [_watch_book_order(client_id, symbol)]
+        await asyncio.gather(*tasks)
 
 
 def _main():
@@ -281,13 +291,15 @@ def _main():
     symbols = symbols.split(",")
     exchanges = os.getenv("EXCHANGES", ",".join(ccxt.exchanges))
     exchanges = exchanges.split(",")
+    bot_token = os.getenv("BOT_TOKEN")
+    bot_chat_id = os.getenv("BOT_CHAT_ID")
     logger.info(f"App initialized with {symbols} and {exchanges} exchanges")
     try:
-        asyncio.run(_run(symbols, exchanges))
+        asyncio.run(_run(symbols, exchanges, bot_token, bot_chat_id))
         logger.info(f"App exited")
     except Exception as e:
         logger.info(f"App exited with error")
-        logging.exception('An error occurred: ')
+        logger.exception('An error occurred: ')
         raise e
 
 
