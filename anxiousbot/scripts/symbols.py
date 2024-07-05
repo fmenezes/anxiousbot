@@ -1,9 +1,10 @@
 import asyncio
-import os
 import csv
+import os
 import sys
 
 import ccxt.pro as ccxt
+
 
 async def _generate_csv(file_path):
     symbols = {}
@@ -25,9 +26,9 @@ async def _generate_csv(file_path):
             await client.close()
     with open(file_path, "w") as f:
         w = csv.writer(f)
-        w.writerow(["symbol","count"] + ccxt.exchanges)
+        w.writerow(["symbol", "count"] + ccxt.exchanges)
         for symbol, exchanges in symbols.items():
-            row = [symbol,len(exchanges)]
+            row = [symbol, len(exchanges)]
             for exchange in ccxt.exchanges:
                 if exchange in exchanges:
                     row += ["y"]

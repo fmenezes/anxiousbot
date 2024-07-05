@@ -234,20 +234,32 @@ async def _watch_deals(symbol, clients):
                         )
                     for deal in deals:
                         row = [
-                                datetime.now(),
-                                deal["symbol"],
-                                deal["profit"],
-                                deal["buy"]["exchange"],
-                                deal["buy"]["total_base"],
-                                deal["buy"]["total_quote"],
-                                deal["sell"]["exchange"],
-                                deal["sell"]["total_base"],
-                                deal["sell"]["total_quote"],
-                            ]
+                            datetime.now(),
+                            deal["symbol"],
+                            deal["profit"],
+                            deal["buy"]["exchange"],
+                            deal["buy"]["total_base"],
+                            deal["buy"]["total_quote"],
+                            deal["sell"]["exchange"],
+                            deal["sell"]["total_base"],
+                            deal["sell"]["total_quote"],
+                        ]
                         row = [str(col) for col in row]
                         f.write(row + "\n")
                         base_coin, quote_coin = deal["symbol"].split("/")
-                        logger.info(f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}', extra={"type":"deal","symbol":deal["symbol"],"exchange":deal["buy"]["exchange"],"sell_exchange":deal["sell"]["exchange"],"buy_quote":deal["buy"]["total_quote"],"buy_base":deal["buy"]["total_base"],"sell_quote":deal["sell"]["total_quote"],"profit":deal["profit"]})
+                        logger.info(
+                            f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}',
+                            extra={
+                                "type": "deal",
+                                "symbol": deal["symbol"],
+                                "exchange": deal["buy"]["exchange"],
+                                "sell_exchange": deal["sell"]["exchange"],
+                                "buy_quote": deal["buy"]["total_quote"],
+                                "buy_base": deal["buy"]["total_base"],
+                                "sell_quote": deal["sell"]["total_quote"],
+                                "profit": deal["profit"],
+                            },
+                        )
             await asyncio.sleep(0.5)
 
     except Exception as e:
