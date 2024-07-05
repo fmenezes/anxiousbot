@@ -102,6 +102,7 @@
               "log_stream_name": "anxiousbot_log_stream"
             }
           }
+
     - name: Clone the GitHub repository
       git:
         repo: 'https://{{ github_token }}@github.com/fmenezes/anxiousbot.git'
@@ -125,6 +126,14 @@
     - name: reload systemd
       systemd:
         daemon_reload: yes
+
+    - name: Symlink .env file
+      ansible.builtin.file:
+        src: /etc/anxiousbot/.env
+        dest: /opt/anxiousbot/.env
+        owner: root
+        group: root
+        state: link
 
     - name: Enable and start CloudWatch Agent service
       systemd:

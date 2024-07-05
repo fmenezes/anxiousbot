@@ -201,9 +201,9 @@ resource "aws_instance" "servers" {
 
   user_data = <<-EOF
     #!/bin/bash
-    echo 'export S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/profile.d/anxiousbot.sh
-    echo 'export SYMBOLS="${local.symbols[count.index]}"' >> /etc/profile.d/anxiousbot.sh
-    source /etc/profile.d/anxiousbot.sh
+    mkdir -p /etc/anxiousbot
+    echo 'S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
+    echo 'SYMBOLS="${local.symbols[count.index]}"' >> /etc/anxiousbot/.env
   EOF
 
   tags = {
