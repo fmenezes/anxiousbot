@@ -80,12 +80,17 @@ def _group(symbols_file_path, marketcap_file_path, out, json_out):
                 ",".join(symbol["exchanges"]),
             ]
         )
-    rows.sort(key=lambda x: x[2], reverse=True)
+    rows.sort(key=lambda x: x[2])
+
+    for row in rows[1001:]:
+        print(
+                f"{row[1]} did not make the cut: {row[2]} marketcap ranking", file=sys.stderr
+            )
     rows = rows[:1000]
 
     rows.sort(key=lambda x: x[3], reverse=True)
     group = 0
-    max_cnn = 75
+    max_cnn = 200
     total_cnn = 0
     low_row = 0
     high_row = len(rows) - 1

@@ -192,7 +192,7 @@ resource "aws_iam_role_policy_attachment" "attach_s3_access_policy" {
 resource "aws_instance" "servers" {
   count                       = length(local.symbols)
   ami                         = "ami-01b799c439fd5516a"
-  instance_type               = "t2.small"
+  instance_type               = "t2.medium"
   subnet_id                   = aws_subnet.main.id
   vpc_security_group_ids      = [aws_security_group.allow_ssh.id]
   associate_public_ip_address = true
