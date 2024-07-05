@@ -25,8 +25,6 @@ formatter = CustomJsonFormatter(timestamp=True)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-bot = Bot(token=os.getenv('BOT_TOKEN'))
-chat_id = os.getenv('BOT_CHAT_ID')
 data = {"/balance/USDT": 100000.0}
 
 common_to_exchange = {
