@@ -65,7 +65,7 @@ async def _watch_book_order(client_id, symbol):
                 )
                 return
             except Exception as e:
-                logger.exception('An error occurred: ')
+                logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
                 logger.debug("retrying...")
                 await asyncio.sleep(0.5)
         if client.markets.get(esymbol) is None:
@@ -92,10 +92,10 @@ async def _watch_book_order(client_id, symbol):
                     extra={"exchange": client_id, "symbol": symbol},
                 )
             except ExchangeError as e:
-                logger.exception('An error occurred: ')
+                logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
                 break
             except Exception as e:
-                logger.exception('An error occurred: ')
+                logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
                 logger.debug("retrying...")
                 await asyncio.sleep(1)
                 continue
@@ -103,13 +103,19 @@ async def _watch_book_order(client_id, symbol):
             data[f"/bids/{symbol}/{client_id}"] = book_order["bids"]
             await asyncio.sleep(1)
     except Exception as e:
-        logger.exception('An error occurred: ')
+        logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
     finally:
         await client.close()
 
 
 def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids):
     base_coin, quote_coin = symbol.split("/")
+
+    if base_coin not in balance:
+        balance[base_coin] = 0
+
+    if quote_coin not in balance:
+        balance[quote_coin] = 0
 
     buy_index = 0
     sell_index = 0
@@ -131,11 +137,10 @@ def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sel
     ):
         buy_price = buy_asks[buy_index][0]
         buy_amount_base = buy_asks[buy_index][1]
-        buy_amount_quote = buy_price * buy_amount_base
         sell_price = sell_bids[sell_index][0]
         sell_amount_base = sell_bids[sell_index][1]
-        sell_amount_quote = sell_price * sell_amount_base
         current_balance_quote = balance[quote_coin]
+        max_buyable_base = current_balance_quote / buy_price
 
         # Ensure buy price is less than or equal to sell price for a match
         if buy_price < sell_price:
@@ -145,25 +150,22 @@ def _match_asks_bids(balance, symbol, buy_exchange, buy_asks, sell_exchange, sel
             sell_price_min = min(sell_price_min, sell_price)
             sell_price_max = max(sell_price_max, sell_price)
 
-            matched_amount_quote = min(
-                buy_amount_quote, sell_amount_quote, current_balance_quote
+            matched_amount_base = min(
+                max_buyable_base, buy_amount_base, sell_amount_base
             )
 
-            if matched_amount_quote > 0:
-                matched_amount_base = matched_amount_quote / buy_price
+            if matched_amount_base > 0:
                 buy_orders += [buy_price, matched_amount_base]
                 sell_orders += [sell_price, matched_amount_base]
 
                 buy_total_base += matched_amount_base
-                buy_total_quote += matched_amount_quote
+                buy_total_quote += matched_amount_base * buy_price
                 sell_total_quote += matched_amount_base * sell_price
 
                 # Update the amounts
                 buy_asks[buy_index][1] -= matched_amount_base
                 sell_bids[sell_index][1] -= matched_amount_base
-                balance[quote_coin] -= matched_amount_quote
-                if base_coin not in balance:
-                    balance[base_coin] = 0
+                balance[quote_coin] -= matched_amount_base * buy_price
                 balance[base_coin] += matched_amount_base
 
             # Remove orders that are fully matched
@@ -264,13 +266,13 @@ async def _watch_deals(symbol, clients, bot, chat_id):
                         )
                         try:
                             bot.send_message(chat_id=chat_id, text=deal_msg)
-                        except Exception:
-                            logger.exception('An error occurred: ')
+                        except Exception as e:
+                            logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
 
             await asyncio.sleep(0.5)
 
     except Exception as e:
-        logger.exception('An error occurred: ')
+        logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
 
 
 async def _run(symbols, exchanges, bot_token, bot_chat_id):
@@ -297,7 +299,7 @@ def _main():
         logger.info(f"App exited")
     except Exception as e:
         logger.info(f"App exited with error")
-        logger.exception('An error occurred: ')
+        logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
         raise e
 
 
