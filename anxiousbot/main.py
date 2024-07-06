@@ -96,6 +96,7 @@ async def _watch_book_order(client_id, symbol):
                     f"loaded book orders for {client_id} in {(end - start)}",
                     extra={"exchange": client_id, "symbol": symbol},
                 )
+                attempts = [1, 2, 4, 8]
             except ExchangeError as e:
                 logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
                 break
