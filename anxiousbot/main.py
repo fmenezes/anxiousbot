@@ -48,6 +48,7 @@ async def _watch_book_order(client_id, symbol):
     esymbol = _common_symbol_to_exchange(symbol, client_id)
     try:
         logger.debug(f"loading markets for {client_id}")
+        attempts = [1, 2, 4, 8]
         while True:
             try:
                 await client.load_markets()
@@ -66,8 +67,11 @@ async def _watch_book_order(client_id, symbol):
                 return
             except Exception as e:
                 logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
+                if len(attempts) == 0:
+                    return
                 logger.debug("retrying...")
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(attempts[0])
+                attempts = attempts[1:]
         if client.markets.get(esymbol) is None:
             logger.info(
                 f"skipping {client_id}, does not support {symbol}",
@@ -78,6 +82,7 @@ async def _watch_book_order(client_id, symbol):
             f"loaded markets for {client_id}",
             extra={"exchange": client_id, "symbol": symbol},
         )
+        attempts = [1, 2, 4, 8]
         while True:
             try:
                 start = datetime.now()
@@ -96,8 +101,11 @@ async def _watch_book_order(client_id, symbol):
                 break
             except Exception as e:
                 logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
+                if len(attempts) == 0:
+                    break
                 logger.debug("retrying...")
-                await asyncio.sleep(1)
+                await asyncio.sleep(attempts[0])
+                attempts = attempts[1:]
                 continue
             data[f"/asks/{symbol}/{client_id}"] = book_order["asks"]
             data[f"/bids/{symbol}/{client_id}"] = book_order["bids"]
