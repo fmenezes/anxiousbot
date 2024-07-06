@@ -1,6 +1,7 @@
 from telegram import Bot
 import asyncio
 import logging
+import csv
 import os
 from datetime import datetime
 
@@ -240,9 +241,10 @@ async def _watch_deals(symbol, clients, bot, chat_id):
                 )
                 print_header = not os.path.exists(file_name)
                 with open(file_name, "a") as f:
+                    w = csv.writer(f)
                     if print_header:
-                        f.write(
-                            "ts,symbol,profit,buy_exchange,buy_total_base,buy_total_quote,sell_exchange,sell_total_base,sell_total_quote\n"
+                        w.writerow(
+                           ["ts","symbol","profit","buy_exchange","buy_total_base","buy_total_quote","sell_exchange","sell_total_base","sell_total_quote"]
                         )
                     for deal in deals:
                         row = [
@@ -257,7 +259,7 @@ async def _watch_deals(symbol, clients, bot, chat_id):
                             deal["sell"]["total_quote"],
                         ]
                         row = [str(col) for col in row]
-                        f.write(row + "\n")
+                        w.writerow(row)
                         base_coin, quote_coin = deal["symbol"].split("/")
                         deal_msg = f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}'
                         logger.info(
