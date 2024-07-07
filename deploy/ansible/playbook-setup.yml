@@ -188,4 +188,4 @@
         name: "Run script every hour"
         minute: "0"
         hour: "*"
-        job: "/opt/anxiousbot/deploy/ansible/s3sync.sh"
+        job: "/opt/anxiousbot/deploy/ansible/s3sync.sh >> /var/log/anxiousbot/s3sync.log 2>&1"

@@ -111,7 +111,6 @@ async def _watch_book_order(client_id, symbol):
                 continue
             data[f"/asks/{symbol}/{client_id}"] = book_order["asks"]
             data[f"/bids/{symbol}/{client_id}"] = book_order["bids"]
-            await asyncio.sleep(1)
     except Exception as e:
         logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
     finally:
@@ -276,7 +275,7 @@ async def _watch_deals(symbol, clients, bot, chat_id):
                             },
                         )
                         try:
-                            bot.send_message(chat_id=chat_id, text=deal_msg)
+                            await bot.send_message(chat_id=chat_id, text=deal_msg)
                         except Exception as e:
                             logger.exception(f'An error occurred: [{type(e).__name__}] {str(e)}')
 
