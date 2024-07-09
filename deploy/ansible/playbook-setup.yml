@@ -30,6 +30,7 @@
           - python3-pip
           - amazon-cloudwatch-agent
           - cronie
+          - awscli
         state: latest
 
     - name: Install Poetry
@@ -99,9 +100,21 @@
                 "files": {
                   "collect_list": [
                     {
-                      "file_path": "/var/log/anxiousbot/*.log",
+                      "file_path": "/var/log/anxiousbot/log.log",
                       "log_group_name": "anxiousbot-logs",
-                      "log_stream_name": "{instance_id}-messages",
+                      "log_stream_name": "{instance_id}-log.log",
+                      "timezone": "UTC"
+                    },
+                    {
+                      "file_path": "/var/log/anxiousbot/log_error.log",
+                      "log_group_name": "anxiousbot-logs",
+                      "log_stream_name": "{instance_id}-log_error.log",
+                      "timezone": "UTC"
+                    },
+                    {
+                      "file_path": "/var/log/anxiousbot/s3sync.log",
+                      "log_group_name": "anxiousbot-logs",
+                      "log_stream_name": "{instance_id}-s3sync.log",
                       "timezone": "UTC"
                     }
                   ]
@@ -177,15 +190,28 @@
         enabled: yes
         state: started
 
+    - name: Add cronjob script
+      copy:
+        dest: /etc/anxiousbot/s3sync.sh
+        content: |
+          #!/bin/bash
+          source "/opt/anxiousbot/.env"
+          DATA_DIR="/opt/anxiousbot/data"
+          aws s3 sync "$DATA_DIR" "s3://$S3BUCKET" --exclude .gitkeep
+          ls -laA "$DATA_DIR" | grep -v "$(date +%Y-%m-%d).csv" | grep -v .gitkeep | xargs rm -rf
+        owner: root
+        group: root
+        mode: 0744
+
+    - name: Add cronjob
+      cron:
+        name: "Run script every hour"
+        minute: "0"
+        job: "/etc/anxiousbot/s3sync.sh >> /var/log/anxiousbot/s3sync.log 2>&1"
+
     - name: Enable and start Anxiousbot Service
       systemd:
         name: anxiousbot
         state: started
         enabled: yes
 
-    - name: Add cronjob
-      cron:
-        name: "Run script every hour"
-        minute: "0"
-        hour: "*"
-        job: "/opt/anxiousbot/deploy/ansible/s3sync.sh >> /var/log/anxiousbot/s3sync.log 2>&1"
