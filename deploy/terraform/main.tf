@@ -188,6 +188,22 @@ resource "aws_iam_role_policy_attachment" "attach_s3_access_policy" {
   policy_arn = aws_iam_policy.s3_bucket_access.arn
 }
 
+resource "aws_security_group" "cache_sg" {
+  vpc_id = aws_vpc.main.id
+
+  ingress {
+    from_port   = 11211
+    to_port     = 11211
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"]  # or the specific IP range of your EC2 instances
+  }
+
+  tags = {
+    Name    = "anxiousbot-cache-sg"
+    Project = "anxiousbot"
+  }
+}
+
 # Memcached subnet
 resource "aws_elasticache_subnet_group" "cache_subnet_group" {
   name       = "anxiousbot-cache-subnet-group"
@@ -205,8 +221,8 @@ resource "aws_elasticache_cluster" "cache_cluster" {
   engine               = "memcached"
   node_type            = "cache.t2.small"
   num_cache_nodes      = 1
-
-  subnet_group_name = aws_elasticache_subnet_group.cache_subnet_group.name
+  security_group_ids   = [aws_security_group.cache_sg.id]
+  subnet_group_name    = aws_elasticache_subnet_group.cache_subnet_group.name
 
   tags = {
     Name    = "anxiousbot-memcached-cluster"
