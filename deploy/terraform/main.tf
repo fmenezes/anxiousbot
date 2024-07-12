@@ -256,6 +256,30 @@ resource "aws_instance" "updater" {
   }
 }
 
+# EC2 Instance
+resource "aws_instance" "dealer" {
+  ami                         = "ami-01b799c439fd5516a"
+  instance_type               = "t2.medium"
+  subnet_id                   = aws_subnet.main.id
+  vpc_security_group_ids      = [aws_security_group.allow_ssh.id]
+  associate_public_ip_address = true
+  key_name                    = "filipe"
+  iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
+
+  user_data = <<-EOF
+    #!/bin/bash
+    mkdir -p /etc/anxiousbot
+    echo 'S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
+    echo 'CACHE_ENDPOINT="${aws_elasticache_cluster.cache_cluster.configuration_endpoint}"' >> /etc/anxiousbot/.env
+  EOF
+
+  tags = {
+    Name    = "anxiousbot-dealer"
+    Role    = "dealer"
+    Project = "anxiousbot"
+  }
+}
+
 output "updater_instance_ids" {
   description = "List of instance IDs"
   value       = [for instance in aws_instance.updater : instance.id]
@@ -264,4 +288,14 @@ output "updater_instance_ids" {
 output "updater_public_ips" {
   description = "List of public IP addresses"
   value       = [for instance in aws_instance.updater : instance.public_ip]
+}
+
+output "dealer_instance_id" {
+  description = "Instance ID"
+  value       = aws_instance.dealer.id
+}
+
+output "dealer_public_ip" {
+  description = "Public IP address"
+  value       = aws_instance.dealer.public_ip
 }
