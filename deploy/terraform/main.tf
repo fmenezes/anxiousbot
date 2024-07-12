@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 locals {
-  symbols = jsondecode(file("../../data/groups.json"))
+  config = jsondecode(file("../../config/config.json"))
 }
 
 # S3 Bucket
@@ -188,9 +188,35 @@ resource "aws_iam_role_policy_attachment" "attach_s3_access_policy" {
   policy_arn = aws_iam_policy.s3_bucket_access.arn
 }
 
+# Memcached subnet
+resource "aws_elasticache_subnet_group" "cache_subnet_group" {
+  name       = "anxiousbot-cache-subnet-group"
+  subnet_ids = [aws_subnet.main.id]
+
+  tags = {
+    Name    = "anxiousbot-cache-subnet-group"
+    Project = "anxiousbot"
+  }
+}
+
+# Memcached cluster
+resource "aws_elasticache_cluster" "cache_cluster" {
+  cluster_id           = "anxiousbot-memcached-cluster"
+  engine               = "memcached"
+  node_type            = "cache.t2.small"
+  num_cache_nodes      = 1
+
+  subnet_group_name = aws_elasticache_subnet_group.cache_subnet_group.name
+
+  tags = {
+    Name    = "anxiousbot-memcached-cluster"
+    Project = "anxiousbot"
+  }
+}
+
 # EC2 Instance
-resource "aws_instance" "servers" {
-  count                       = length(local.symbols)
+resource "aws_instance" "updater" {
+  count                       = length(local.config.updater)
   ami                         = "ami-01b799c439fd5516a"
   instance_type               = "t2.medium"
   subnet_id                   = aws_subnet.main.id
@@ -203,21 +229,23 @@ resource "aws_instance" "servers" {
     #!/bin/bash
     mkdir -p /etc/anxiousbot
     echo 'S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
-    echo 'SYMBOLS="${local.symbols[count.index]}"' >> /etc/anxiousbot/.env
+    echo 'UPDATER_INDEX="${count.index}"' >> /etc/anxiousbot/.env
+    echo 'CACHE_ENDPOINT="${aws_elasticache_cluster.cache_cluster.configuration_endpoint}"' >> /etc/anxiousbot/.env
   EOF
 
   tags = {
-    Name    = "anxiousbot-server-${count.index + 1}"
+    Name    = "anxiousbot-updater-${count.index + 1}"
+    Role    = "updater"
     Project = "anxiousbot"
   }
 }
 
-output "instance_ids" {
+output "updater_instance_ids" {
   description = "List of instance IDs"
-  value       = [for instance in aws_instance.servers : instance.id]
+  value       = [for instance in aws_instance.updater : instance.id]
 }
 
-output "public_ips" {
+output "updater_public_ips" {
   description = "List of public IP addresses"
-  value       = [for instance in aws_instance.servers : instance.public_ip]
+  value       = [for instance in aws_instance.updater : instance.public_ip]
 }
