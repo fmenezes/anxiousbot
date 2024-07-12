@@ -1,8 +1,10 @@
 import logging
+
 from pythonjsonlogger import jsonlogger
 
+
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    def __init__(self, extra = None, *args, **kwargs):
+    def __init__(self, extra=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._extra = extra
 
@@ -12,7 +14,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
         if self._extra is not None:
             for key, value in self._extra.items():
                 log_record[key] = value
-        
+
 
 def get_logger(extra=None):
     logger = logging.getLogger(__name__)
