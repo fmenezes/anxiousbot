@@ -1,3 +1,4 @@
+import logging
 from pythonjsonlogger import jsonlogger
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):

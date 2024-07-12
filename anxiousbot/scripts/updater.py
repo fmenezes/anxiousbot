@@ -15,6 +15,8 @@ class Updater:
     def __init__(self, memcache_client = None, logger = None) -> None:
         if logger is None:
             self.logger = get_logger()
+        else:
+            self.logger = logger
         if memcache_client is not None:
             self.memcache_client = memcache_client
         else:
