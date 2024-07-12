@@ -6,8 +6,8 @@ import traceback
 
 import ccxt.pro as ccxt
 from dotenv import load_dotenv
-from pymemcache.client.base import Client as MemcacheClient
 from pymemcache import serde
+from pymemcache.client.base import Client as MemcacheClient
 
 from anxiousbot.log import get_logger
 

@@ -5,9 +5,10 @@ import os
 from datetime import datetime
 
 from dotenv import load_dotenv
-from pymemcache.client.base import Client as MemcacheClient
 from pymemcache import serde
+from pymemcache.client.base import Client as MemcacheClient
 from telegram import Bot
+from telegram.request import HTTPXRequest
 
 from anxiousbot.log import get_logger
 
@@ -206,7 +207,9 @@ class Dealer:
             self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
 
     async def run(self, config, bot_token, bot_chat_id):
-        async with Bot(bot_token) as bot:
+        async with Bot(
+            bot_token, request=HTTPXRequest(connection_pool_size=1000)
+        ) as bot:
             tasks = []
             for symbol, exchanges in config["symbols"].items():
                 tasks += [self._watch_deals(symbol, exchanges, bot, bot_chat_id)]
