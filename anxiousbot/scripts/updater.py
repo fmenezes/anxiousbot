@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import os
 import sys
 import traceback
@@ -8,6 +7,7 @@ import traceback
 import ccxt.pro as ccxt
 from dotenv import load_dotenv
 from pymemcache.client.base import Client as MemcacheClient
+from pymemcache import serde
 
 from anxiousbot.log import get_logger
 
@@ -114,10 +114,11 @@ class Updater:
                 self.logger.exception(e, extra={"exchange": setting["exchange"]})
             finally:
                 await client.close()
-            self.logger.debug(
-                f"Exiting {setting['exchange']} / {setting['mode']}",
-                extra={"exchange": setting["exchange"]},
-            )
+                self.logger.debug(
+                    f"Closing {setting['exchange']}",
+                    extra={"exchange": setting["exchange"]},
+                )
+            await asyncio.sleep(1)
 
     async def run(self, settings):
         try:
@@ -149,19 +150,18 @@ def _main():
     with open("./config/config.json", "r") as f:
         config = json.load(f)
     logger = get_logger({"app": "updater", "config": UPDATER_INDEX})
-    memcache_client = MemcacheClient(CACHE_ENDPOINT)
+    memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
     updater = Updater(logger=logger, memcache_client=memcache_client)
     try:
         logger.info(f"Updater started")
         sys.excepthook = updater.handle_exception
         asyncio.run(updater.run(config["updater"][int(UPDATER_INDEX)]))
         logger.info(f"Updater exited successfully")
-        exit_code = 0
+        return 0
     except Exception as e:
         logger.info(f"Updater exited with error")
         logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
-        exit_code = 1
-    return exit_code
+        return 1
 
 
 if __name__ == "__main__":
