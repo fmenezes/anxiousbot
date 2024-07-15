@@ -86,9 +86,20 @@ class Dealer(App):
                 # If the prices don't match, exit the loop
                 break
 
+        profit = self.exchanges[sell_exchange].price_to_precision(symbol, sell_total_quote - buy_total_quote)
+        profit_percentage = self.exchanges[sell_exchange].amount_to_precision(symbol, 100 - ((sell_total_quote / buy_total_quote) * 100))
+        buy_price_min = self.exchanges[buy_exchange].price_to_precision(symbol, buy_price_min)
+        buy_price_max = self.exchanges[buy_exchange].price_to_precision(symbol, buy_price_max)
+        buy_total_quote = self.exchanges[buy_exchange].amount_to_precision(symbol, buy_total_quote)
+        buy_total_base = self.exchanges[buy_exchange].amount_to_precision(symbol, buy_total_base)
+        sell_price_min = self.exchanges[sell_exchange].price_to_precision(symbol, sell_price_min)
+        sell_price_max = self.exchanges[sell_exchange].price_to_precision(symbol, sell_price_max)
+        sell_total_quote = self.exchanges[sell_exchange].amount_to_precision(symbol, sell_total_quote)
+        sell_total_base = self.exchanges[sell_exchange].amount_to_precision(symbol, sell_total_base)
         return {
             "ts": str(datetime.now()),
-            "profit": (sell_total_quote - buy_total_quote),
+            "profit": profit,
+            "profit_percentage": profit_percentage,
             "symbol": symbol,
             "buy": {
                 "exchange": buy_exchange,
@@ -197,13 +208,26 @@ class Dealer(App):
         except Exception as e:
             self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
 
+    async def _init_exchanges(self, config):
+        self.exchanges = {}
+        all_exchanges = []
+        for symbol, exchanges in config["symbols"].items():
+            all_exchanges += exchanges
+        all_exchanges = list(set(all_exchanges))
+        for exchange_id in all_exchanges:
+            self.exchanges[exchange_id] = self.setup_exchange(exchange_id)
+
+
     async def run(self, config, bot_token, bot_chat_id):
         async with Bot(
             bot_token, request=HTTPXRequest(connection_pool_size=1000)
         ) as bot:
+            await self._init_exchanges()
+
             tasks = []
             for symbol, exchanges in config["symbols"].items():
                 tasks += [self._watch_deals(symbol, exchanges, bot, bot_chat_id)]
+
             await asyncio.gather(*tasks)
 
 
