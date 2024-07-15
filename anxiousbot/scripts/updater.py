@@ -52,30 +52,32 @@ class Updater:
 
         return id
 
+    def _init_exchange(self, exchange_id):
+        env_exchange_id = self._convert_exchange_id_for_auth(exchange_id).upper()
+        api_key = os.getenv(f"{env_exchange_id}_API_KEY")
+        secret = os.getenv(f"{env_exchange_id}_SECRET")
+        passphrase = os.getenv(f"{env_exchange_id}_PASSPHRASE")
+        auth = None
+        if api_key is not None or secret is not None or passphrase is not None:
+            auth = {
+                "apiKey": api_key,
+                "secret": secret,
+                "passphrase": passphrase,
+            }
+        client_cls = getattr(ccxt, exchange_id)
+        if auth is not None:
+            client = client_cls(auth)
+            self.logger.debug(
+                f"{exchange_id} logged in",
+                extra={"exchange": exchange_id},
+            )
+        else:
+            client = client_cls()
+        return client
+
     async def _watch_order_book(self, setting):
         while True:
-            exchange_id = self._convert_exchange_id_for_auth(
-                setting["exchange"]
-            ).upper()
-            api_key = os.getenv(f"{exchange_id}_API_KEY")
-            secret = os.getenv(f"{exchange_id}_SECRET")
-            passphrase = os.getenv(f"{exchange_id}_PASSPHRASE")
-            auth = None
-            if api_key is not None or secret is not None or passphrase is not None:
-                auth = {
-                    "apiKey": api_key,
-                    "secret": secret,
-                    "passphrase": passphrase,
-                }
-            client_cls = getattr(ccxt, setting["exchange"])
-            if auth is not None:
-                client = client_cls(auth)
-                self.logger.debug(
-                    f"{setting['exchange']} logged in",
-                    extra={"exchange": setting["exchange"]},
-                )
-            else:
-                client = client_cls()
+            client = self._init_exchange(setting["exchange"])
 
             try:
                 await self._exponential_backoff(client.load_markets)
