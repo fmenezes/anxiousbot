@@ -4,7 +4,6 @@ import os
 import sys
 import traceback
 
-from dotenv import load_dotenv
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
@@ -76,7 +75,6 @@ class Updater(App):
 
 
 async def run():
-    load_dotenv(override=True)
     CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/config.json")
     UPDATER_INDEX = os.getenv("UPDATER_INDEX", "0")
     CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT", "localhost")

@@ -1,11 +1,15 @@
 import argparse
 import asyncio
 
+from dotenv import load_dotenv
+
 from anxiousbot.dealer import run as dealer_run
 from anxiousbot.updater import run as updater_run
 
 
 def _main():
+    load_dotenv(override=True)
+
     parser = argparse.ArgumentParser(prog="anxiousbot")
     subparsers = parser.add_subparsers(dest="command")
     dealer_parser = subparsers.add_parser("dealer", help="Run the dealer")
