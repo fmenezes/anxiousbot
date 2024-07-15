@@ -144,7 +144,7 @@ class Dealer(App):
                             balance, symbol, buy_cilent_id, asks, sell_client_id, bids
                         )
                     ]
-                deals = [deal for deal in deals if deal["profit"] > 0]
+                deals = [deal for deal in deals if deal["profit_percentage"] >= 1]
                 self.logger.debug(f"found {len(deals)} deals", extra={"symbol": symbol})
                 if len(deals) > 0:
                     file_name = os.path.abspath(
