@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 
 from anxiousbot.dealer import run as dealer_run
 from anxiousbot.updater import run as updater_run
@@ -11,9 +12,9 @@ def _main():
     updater_parser = subparsers.add_parser("updater", help="Run the updater")
     args = parser.parse_args()
     if args.command == "dealer":
-        return dealer_run()
+        return asyncio.run(dealer_run())
     elif args.command == "updater":
-        return updater_run()
+        return asyncio.run(updater_run())
     parser.print_help()
     return 1
 

@@ -4,122 +4,58 @@ import os
 import sys
 import traceback
 
-import ccxt.pro as ccxt
 from dotenv import load_dotenv
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
 from anxiousbot.log import get_logger
+from anxiousbot import App, closing
 
+DEFAULT_EXPIRE_BOOK_ORDERS = 60
 
-class Updater:
-    def __init__(self, memcache_client=None, logger=None) -> None:
-        if logger is None:
-            self.logger = get_logger()
-        else:
-            self.logger = logger
-        if memcache_client is not None:
-            self.memcache_client = memcache_client
-        else:
-            self.memcache_client = MemcacheClient("localhost")
-
-    async def _exponential_backoff(self, fn, *args, **kwargs):
-        backoff = [1, 2, 4, 8]
-        last_exception = None
-        for delay in backoff:
-            try:
-                return await fn(*args, **kwargs)
-            except asyncio.CancelledError as e:
-                raise e
-            except Exception as e:
-                await asyncio.sleep(delay)
-                last_exception = e
-        raise last_exception
-
-    def _convert_exchange_id_for_auth(self, id):
-        data = {
-            "coinbaseexchange": "coinbase",
-            "coinbaseinternational": "coinbase",
-            "binanceusdm": "binance",
-            "binancecoinm": "binance",
-        }
-
-        if id in data:
-            return data[id]
-
-        if id.endswith("futures"):
-            return id.removesuffix("futures")
-
-        return id
-
-    def _init_exchange(self, exchange_id):
-        env_exchange_id = self._convert_exchange_id_for_auth(exchange_id).upper()
-        api_key = os.getenv(f"{env_exchange_id}_API_KEY")
-        secret = os.getenv(f"{env_exchange_id}_SECRET")
-        passphrase = os.getenv(f"{env_exchange_id}_PASSPHRASE")
-        auth = None
-        if api_key is not None or secret is not None or passphrase is not None:
-            auth = {
-                "apiKey": api_key,
-                "secret": secret,
-                "passphrase": passphrase,
-            }
-        client_cls = getattr(ccxt, exchange_id)
-        if auth is not None:
-            client = client_cls(auth)
-            self.logger.debug(
-                f"{exchange_id} logged in",
-                extra={"exchange": exchange_id},
-            )
-        else:
-            client = client_cls()
-        return client
+class Updater(App):
+    def __init__(self, expire_book_orders = DEFAULT_EXPIRE_BOOK_ORDERS, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.expire_book_orders = expire_book_orders
 
     async def _watch_order_book(self, setting):
         while True:
-            client = self._init_exchange(setting["exchange"])
-
             try:
-                await self._exponential_backoff(client.load_markets)
-                self.logger.info(
-                    f"{setting['exchange']} loaded markets",
-                    extra={"exchange": setting["exchange"]},
-                )
-
-                while True:
-                    param = setting["symbols"]
-                    match setting["mode"]:
-                        case "single":
-                            await asyncio.sleep(0.5)
-                            order_book = await self._exponential_backoff(
-                                client.fetch_order_book, param[0]
+                async with closing(await self.setup_exchange(setting["exchange"], required_markets=True)) as client:
+                    while True:
+                        param = setting["symbols"]
+                        match setting["mode"]:
+                            case "single":
+                                await asyncio.sleep(0.5)
+                                order_book = await self.exponential_backoff(
+                                    client.fetch_order_book, param[0]
+                                )
+                            case "all":
+                                order_book = await self.exponential_backoff(
+                                    client.fetch_order_books
+                                )
+                            case "batch":
+                                order_book = await self.exponential_backoff(
+                                    client.watch_order_book_for_symbols, param
+                                )
+                        if "asks" in order_book:
+                            self.memcache_client.set(
+                                f"/asks/{order_book['symbol']}/{setting['exchange']}",
+                                order_book["asks"],
+                                expire=self.expire_book_orders,
                             )
-                        case "all":
-                            order_book = await self._exponential_backoff(
-                                client.fetch_order_books
+                        if "bids" in order_book:
+                            self.memcache_client.set(
+                                f"/bids/{order_book['symbol']}/{setting['exchange']}",
+                                order_book["bids"],
+                                expire=self.expire_book_orders,
                             )
-                        case "batch":
-                            order_book = await self._exponential_backoff(
-                                client.watch_order_book_for_symbols, param
-                            )
-                    if "asks" in order_book:
-                        self.memcache_client.set(
-                            f"/asks/{order_book['symbol']}/{setting['exchange']}",
-                            order_book["asks"],
-                        )
-                    if "bids" in order_book:
-                        self.memcache_client.set(
-                            f"/bids/{order_book['symbol']}/{setting['exchange']}",
-                            order_book["bids"],
-                        )
             except Exception as e:
                 self.logger.exception(e, extra={"exchange": setting["exchange"]})
-            finally:
-                await client.close()
-                self.logger.debug(
-                    f"Closing {setting['exchange']}",
-                    extra={"exchange": setting["exchange"]},
-                )
+            self.logger.debug(
+                f"Closed {setting['exchange']}",
+                extra={"exchange": setting["exchange"]},
+            )
             await asyncio.sleep(1)
 
     async def run(self, settings):
@@ -139,7 +75,7 @@ class Updater:
             raise e
 
 
-def run():
+async def run():
     load_dotenv(override=True)
     CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/config.json")
     UPDATER_INDEX = os.getenv("UPDATER_INDEX", "0")
@@ -154,13 +90,13 @@ def run():
 
     sys.excepthook = handle_exception
     memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
-    updater = Updater(logger=logger, memcache_client=memcache_client)
-    try:
-        logger.info(f"Updater started")
-        asyncio.run(updater.run(config["updater"][int(UPDATER_INDEX)]))
-        logger.info(f"Updater exited successfully")
-        return 0
-    except Exception as e:
-        logger.info(f"Updater exited with error")
-        logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
-        return 1
+    async with closing(Updater(logger=logger, memcache_client=memcache_client)) as updater:
+        try:
+            logger.info(f"Updater started")
+            await updater.run(config["updater"][int(UPDATER_INDEX)])
+            logger.info(f"Updater exited successfully")
+            return 0
+        except Exception as e:
+            logger.info(f"Updater exited with error")
+            logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
+            return 1

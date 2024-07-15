@@ -10,20 +10,11 @@ from pymemcache.client.base import Client as MemcacheClient
 from telegram import Bot
 from telegram.request import HTTPXRequest
 
+from anxiousbot import App, closing
 from anxiousbot.log import get_logger
 
 
-class Dealer:
-    def __init__(self, logger=None, memcache_client=None):
-        if logger is not None:
-            self.logger = logger
-        else:
-            self.logger = get_logger()
-        if memcache_client is not None:
-            self.memcache_client = memcache_client
-        else:
-            self.memcache_client = MemcacheClient("localhost")
-
+class Dealer(App):
     def _match_asks_bids(
         self, balance, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids
     ):
@@ -216,7 +207,7 @@ class Dealer:
             await asyncio.gather(*tasks)
 
 
-def run():
+async def run():
     load_dotenv(override=True)
     CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/config.json")
     BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -229,13 +220,13 @@ def run():
     logger = get_logger(extra={"app": "dealer"})
     memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
     memcache_client.set("/balance/USDT", 100000)
-    dealer = Dealer(memcache_client=memcache_client)
-    try:
-        logger.info(f"Dealer started")
-        asyncio.run(dealer.run(config["dealer"], BOT_TOKEN, BOT_CHAT_ID))
-        logger.info(f"Dealer exited")
-        return 0
-    except Exception as e:
-        logger.info(f"Dealer exited with error")
-        logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
-        return 1
+    async with closing(Dealer(memcache_client=memcache_client, logger=logger)) as dealer:
+        try:
+            logger.info(f"Dealer started")
+            await dealer.run(config["dealer"], BOT_TOKEN, BOT_CHAT_ID)
+            logger.info(f"Dealer exited")
+            return 0
+        except Exception as e:
+            logger.info(f"Dealer exited with error")
+            logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
+            return 1
