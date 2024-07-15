@@ -1,4 +1,5 @@
 import asyncio
+from asyncio import Queue
 import csv
 import json
 import os
@@ -14,6 +15,11 @@ from anxiousbot.log import get_logger
 
 
 class Dealer(App):
+    def __init__(self, bot_token, bot_chat_id, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bot_token = bot_token
+        self.bot_chat_id = bot_chat_id
+
     def _match_asks_bids(
         self, balance, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids
     ):
@@ -127,7 +133,7 @@ class Dealer(App):
             },
         }
 
-    async def _watch_deals(self, symbol, clients, bot, chat_id):
+    async def _watch_deals(self, symbol, clients, bot_queue):
         try:
             while True:
                 self.logger.debug(
@@ -191,27 +197,7 @@ class Dealer(App):
                             ]
                             row = [str(col) for col in row]
                             w.writerow(row)
-                            base_coin, quote_coin = deal["symbol"].split("/")
-                            deal_msg = f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}'
-                            self.logger.info(
-                                deal_msg,
-                                extra={
-                                    "type": "deal",
-                                    "symbol": deal["symbol"],
-                                    "exchange": deal["buy"]["exchange"],
-                                    "sell_exchange": deal["sell"]["exchange"],
-                                    "buy_quote": deal["buy"]["total_quote"],
-                                    "buy_base": deal["buy"]["total_base"],
-                                    "sell_quote": deal["sell"]["total_quote"],
-                                    "profit": deal["profit"],
-                                },
-                            )
-                            try:
-                                await bot.send_message(chat_id=chat_id, text=deal_msg)
-                            except Exception as e:
-                                self.logger.exception(
-                                    f"An error occurred: [{type(e).__name__}] {str(e)}"
-                                )
+                            await bot_queue.put(deal)
 
                 await asyncio.sleep(0.5)
 
@@ -228,17 +214,45 @@ class Dealer(App):
             self.exchanges[exchange_id] = await self.setup_exchange(exchange_id)
 
 
-    async def run(self, config, bot_token, bot_chat_id):
+    async def _watch_bot_queue(self, bot_queue):
         async with Bot(
-            bot_token, request=HTTPXRequest(connection_pool_size=1000)
+            self.bot_token, request=HTTPXRequest(connection_pool_size=1000)
         ) as bot:
-            await self._init_exchanges(config)
+            while True:
+                deal = await bot_queue.get()
 
-            tasks = []
-            for symbol, exchanges in config["symbols"].items():
-                tasks += [self._watch_deals(symbol, exchanges, bot, bot_chat_id)]
+                base_coin, quote_coin = deal["symbol"].split("/")
+                deal_msg = f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}'
+                self.logger.info(
+                    deal_msg,
+                    extra={
+                        "type": "deal",
+                        "symbol": deal["symbol"],
+                        "exchange": deal["buy"]["exchange"],
+                        "sell_exchange": deal["sell"]["exchange"],
+                        "buy_quote": deal["buy"]["total_quote"],
+                        "buy_base": deal["buy"]["total_base"],
+                        "sell_quote": deal["sell"]["total_quote"],
+                        "profit": deal["profit"],
+                    },
+                )
+                try:
+                    await bot.send_message(chat_id=self.bot_chat_id, text=deal_msg)
+                except Exception as e:
+                    self.logger.exception(
+                        f"An error occurred: [{type(e).__name__}] {str(e)}"
+                    )
 
-            await asyncio.gather(*tasks)
+    async def run(self, config):
+        await self._init_exchanges(config)
+
+        bot_queue = Queue()
+
+        tasks = [self._watch_bot_queue(bot_queue)]
+        for symbol, exchanges in config["symbols"].items():
+            tasks += [self._watch_deals(symbol, exchanges, bot_queue)]
+
+        await asyncio.gather(*tasks)
 
 
 async def run():
@@ -253,10 +267,10 @@ async def run():
     logger = get_logger(extra={"app": "dealer"})
     memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
     memcache_client.set("/balance/USDT", 100000)
-    async with closing(Dealer(memcache_client=memcache_client, logger=logger)) as dealer:
+    async with closing(Dealer(memcache_client=memcache_client, logger=logger, bot_chat_id=BOT_CHAT_ID, bot_token=BOT_TOKEN)) as dealer:
         try:
             logger.info(f"Dealer started")
-            await dealer.run(config["dealer"], BOT_TOKEN, BOT_CHAT_ID)
+            await dealer.run(config["dealer"])
             logger.info(f"Dealer exited")
             return 0
         except Exception as e:
