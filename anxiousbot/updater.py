@@ -138,25 +138,25 @@ class Updater:
         except Exception as e:
             raise e
 
-    def handle_exception(self, exc_type, exc_value, exc_traceback):
-        self.logger.exception(
-            traceback.format_exception(exc_type, exc_value, exc_traceback)
-        )
 
-
-def _main():
+def run():
     load_dotenv(override=True)
+    CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/config.json")
     UPDATER_INDEX = os.getenv("UPDATER_INDEX", "0")
     CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT", "localhost")
 
-    with open("./config/config.json", "r") as f:
+    with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
     logger = get_logger({"app": "updater", "config": UPDATER_INDEX})
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        logger.exception(traceback.format_exception(exc_type, exc_value, exc_traceback))
+
+    sys.excepthook = handle_exception
     memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
     updater = Updater(logger=logger, memcache_client=memcache_client)
     try:
         logger.info(f"Updater started")
-        sys.excepthook = updater.handle_exception
         asyncio.run(updater.run(config["updater"][int(UPDATER_INDEX)]))
         logger.info(f"Updater exited successfully")
         return 0
@@ -164,7 +164,3 @@ def _main():
         logger.info(f"Updater exited with error")
         logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
         return 1
-
-
-if __name__ == "__main__":
-    exit(_main())

@@ -153,7 +153,7 @@
           User=root
           Group=root
           WorkingDirectory=/opt/anxiousbot
-          ExecStart=/usr/local/bin/poetry run updater
+          ExecStart=/usr/local/bin/poetry run main updater
           Restart=always
           RestartSec=5s
           StandardOutput=append:/var/log/anxiousbot/stdout.log
@@ -399,7 +399,7 @@
           User=root
           Group=root
           WorkingDirectory=/opt/anxiousbot
-          ExecStart=/usr/local/bin/poetry run dealer
+          ExecStart=/usr/local/bin/poetry run main dealer
           Restart=always
           RestartSec=5s
           StandardOutput=append:/var/log/anxiousbot/stdout.log
