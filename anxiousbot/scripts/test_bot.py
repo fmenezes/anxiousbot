@@ -6,7 +6,7 @@ from telegram import Bot, Update
 from telegram.error import Forbidden, NetworkError
 
 
-async def _test(bot, chat_id):
+async def _test(bot: Bot, chat_id: str):
     while True:
         await bot.send_message(chat_id, "test")
         await asyncio.sleep(60)

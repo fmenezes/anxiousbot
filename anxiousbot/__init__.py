@@ -1,10 +1,13 @@
 import asyncio
 import os
+from contextlib import asynccontextmanager
+
 import ccxt.pro as ccxt
-from anxiousbot.log import get_logger
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
-from contextlib import asynccontextmanager
+
+from anxiousbot.log import get_logger
+
 
 @asynccontextmanager
 async def closing(thing):
@@ -12,6 +15,7 @@ async def closing(thing):
         yield thing
     finally:
         await thing.close()
+
 
 class App:
     def __init__(self, logger=None, memcache_client=None):
@@ -54,7 +58,7 @@ class App:
 
         return id
 
-    async def setup_exchange(self, exchange_id, required_markets = False):
+    async def setup_exchange(self, exchange_id, required_markets=False):
         env_exchange_id = self._convert_exchange_id_for_auth(exchange_id).upper()
         api_key = os.getenv(f"{env_exchange_id}_API_KEY")
         secret = os.getenv(f"{env_exchange_id}_SECRET")
@@ -90,7 +94,7 @@ class App:
 
         self.clients.append(client)
         return client
-    
+
     async def close(self):
         for client in self.clients:
             await client.close()

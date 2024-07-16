@@ -7,20 +7,25 @@ import traceback
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
-from anxiousbot.log import get_logger
 from anxiousbot import App, closing
+from anxiousbot.log import get_logger
 
 DEFAULT_EXPIRE_BOOK_ORDERS = 60
 
+
 class Updater(App):
-    def __init__(self, expire_book_orders = DEFAULT_EXPIRE_BOOK_ORDERS, *args, **kwargs):
+    def __init__(self, expire_book_orders=DEFAULT_EXPIRE_BOOK_ORDERS, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.expire_book_orders = expire_book_orders
 
     async def _watch_order_book(self, setting):
         while True:
             try:
-                async with closing(await self.setup_exchange(setting["exchange"], required_markets=True)) as client:
+                async with closing(
+                    await self.setup_exchange(
+                        setting["exchange"], required_markets=True
+                    )
+                ) as client:
                     while True:
                         param = setting["symbols"]
                         match setting["mode"]:
@@ -88,7 +93,9 @@ async def run():
 
     sys.excepthook = handle_exception
     memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
-    async with closing(Updater(logger=logger, memcache_client=memcache_client)) as updater:
+    async with closing(
+        Updater(logger=logger, memcache_client=memcache_client)
+    ) as updater:
         try:
             logger.info(f"Updater started")
             await updater.run(config["updater"][int(UPDATER_INDEX)])

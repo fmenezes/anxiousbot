@@ -1,8 +1,8 @@
 import asyncio
-from asyncio import Queue
 import csv
 import json
 import os
+from asyncio import Queue
 from datetime import datetime
 
 from pymemcache import serde
@@ -91,26 +91,44 @@ class Dealer(App):
                 # If the prices don't match, exit the loop
                 break
 
-        profit =  sell_total_quote - buy_total_quote
+        profit = sell_total_quote - buy_total_quote
         profit_percentage = 0
         if profit != 0:
-            profit = self.exchanges[sell_exchange].price_to_precision(symbol,profit)
-            profit_percentage =  ((profit / buy_total_quote) * 100)
-        profit_percentage = float(self.exchanges[sell_exchange].decimal_to_precision(profit_percentage, precision=2))
+            profit = self.exchanges[sell_exchange].price_to_precision(symbol, profit)
+            profit_percentage = (profit / buy_total_quote) * 100
+        profit_percentage = float(
+            self.exchanges[sell_exchange].decimal_to_precision(
+                profit_percentage, precision=2
+            )
+        )
         if buy_price_min != 0:
-            buy_price_min = self.exchanges[buy_exchange].price_to_precision(symbol, buy_price_min)
+            buy_price_min = self.exchanges[buy_exchange].price_to_precision(
+                symbol, buy_price_min
+            )
         if buy_price_max != 0:
-            buy_price_max = self.exchanges[buy_exchange].price_to_precision(symbol, buy_price_max)
+            buy_price_max = self.exchanges[buy_exchange].price_to_precision(
+                symbol, buy_price_max
+            )
         if buy_total_quote != 0:
-            buy_total_quote = self.exchanges[buy_exchange].amount_to_precision(symbol, buy_total_quote)
+            buy_total_quote = self.exchanges[buy_exchange].amount_to_precision(
+                symbol, buy_total_quote
+            )
         if buy_total_base != 0:
-            buy_total_base = self.exchanges[buy_exchange].amount_to_precision(symbol, buy_total_base)
+            buy_total_base = self.exchanges[buy_exchange].amount_to_precision(
+                symbol, buy_total_base
+            )
         if sell_price_min != 0:
-            sell_price_min = self.exchanges[sell_exchange].price_to_precision(symbol, sell_price_min)
+            sell_price_min = self.exchanges[sell_exchange].price_to_precision(
+                symbol, sell_price_min
+            )
         if sell_price_max != 0:
-            sell_price_max = self.exchanges[sell_exchange].price_to_precision(symbol, sell_price_max)
+            sell_price_max = self.exchanges[sell_exchange].price_to_precision(
+                symbol, sell_price_max
+            )
         if sell_total_quote != 0:
-            sell_total_quote = self.exchanges[sell_exchange].amount_to_precision(symbol, sell_total_quote)
+            sell_total_quote = self.exchanges[sell_exchange].amount_to_precision(
+                symbol, sell_total_quote
+            )
 
         return {
             "ts": str(datetime.now()),
@@ -213,7 +231,6 @@ class Dealer(App):
         for exchange_id in all_exchanges:
             self.exchanges[exchange_id] = await self.setup_exchange(exchange_id)
 
-
     async def _watch_bot_queue(self, bot_queue):
         async with Bot(
             self.bot_token, request=HTTPXRequest(connection_pool_size=1000)
@@ -267,7 +284,14 @@ async def run():
     logger = get_logger(extra={"app": "dealer"})
     memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
     memcache_client.set("/balance/USDT", 100000)
-    async with closing(Dealer(memcache_client=memcache_client, logger=logger, bot_chat_id=BOT_CHAT_ID, bot_token=BOT_TOKEN)) as dealer:
+    async with closing(
+        Dealer(
+            memcache_client=memcache_client,
+            logger=logger,
+            bot_chat_id=BOT_CHAT_ID,
+            bot_token=BOT_TOKEN,
+        )
+    ) as dealer:
         try:
             logger.info(f"Dealer started")
             await dealer.run(config["dealer"])
