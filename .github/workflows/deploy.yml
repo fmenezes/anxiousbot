@@ -44,7 +44,7 @@ jobs:
       - name: Install Ansible
         run: sudo apt-get update && sudo apt-get install -y ansible
 
-      - run: /opt/pipx/venvs/ansible-core/bin/pip install botocore boto3
+      - run: sudo pipx inject ansible-core botocore boto3
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
