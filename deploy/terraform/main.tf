@@ -2,6 +2,16 @@ provider "aws" {
   region = "us-east-1"
 }
 
+terraform {
+  backend "s3" {
+    bucket         = "anxiousbot-terraform-state"
+    key            = "terraform.tfstate"
+    encrypt        = true
+    dynamodb_table = "lock-table"
+    region         = "us-east-1"
+  }
+}
+
 locals {
   config = jsondecode(file("../../config/config.json"))
 }
