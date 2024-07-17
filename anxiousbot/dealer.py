@@ -152,8 +152,8 @@ class Dealer(App):
         }
 
     async def _watch_deals(self, symbol, clients, bot_queue):
-        try:
-            while True:
+        while True:
+            try:
                 self.logger.debug(
                     f"checking deals {symbol}...", extra={"symbol": symbol}
                 )
@@ -218,9 +218,8 @@ class Dealer(App):
                             await bot_queue.put(deal)
 
                 await asyncio.sleep(0.5)
-
-        except Exception as e:
-            self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
+            except Exception as e:
+                self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
 
     async def _init_exchanges(self, config):
         self.exchanges = {}
