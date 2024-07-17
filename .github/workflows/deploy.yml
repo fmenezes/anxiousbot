@@ -55,7 +55,7 @@ jobs:
         env:
           VAULT_PASS: ${{ secrets.VAULT_PASS }}
 
-      - run: mkdir -p  $HOME/.ssh && echo "$SSH_PRIVATE_KEY" > $HOME/.ssh/filipe.pem
+      - run: mkdir -p  $HOME/.ssh && echo "$SSH_PRIVATE_KEY" > $HOME/.ssh/filipe.pem && sudo chmod 400 $HOME/.ssh/filipe.pem
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
