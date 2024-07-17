@@ -26,8 +26,6 @@ jobs:
 
       - run: terraform init
 
-      - run: terraform import aws_s3_bucket.main anxiousbot-main-bucket
-
       - run: terraform apply -auto-approve
 
   ansible:
