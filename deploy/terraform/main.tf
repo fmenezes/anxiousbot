@@ -4,10 +4,10 @@ provider "aws" {
 
 terraform {
   backend "s3" {
-    bucket         = "anxiousbot-terraform-state"
-    key            = "terraform.tfstate"
+    bucket         = "anxiousbot-main-bucket"
+    key            = "terraform/terraform.tfstate"
     encrypt        = true
-    dynamodb_table = "lock-table"
+    dynamodb_table = "terraform-locks-table"
     region         = "us-east-1"
   }
 }
@@ -17,15 +17,8 @@ locals {
 }
 
 # S3 Bucket
-resource "aws_s3_bucket" "main" {
+data "aws_s3_bucket" "main" {
   bucket = "anxiousbot-main-bucket"
-  tags = {
-    Name    = "anxiousbot-main-bucket"
-    Project = "anxiousbot"
-  }
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # VPC
@@ -177,7 +170,7 @@ resource "aws_iam_policy" "s3_bucket_access" {
           "s3:ListBucket",
         ]
         Effect   = "Allow"
-        Resource = "${aws_s3_bucket.main.arn}"
+        Resource = "${data.aws_s3_bucket.main.arn}"
       },
       {
         Action = [
@@ -186,7 +179,7 @@ resource "aws_iam_policy" "s3_bucket_access" {
           "s3:PutObjectAcl",
         ]
         Effect   = "Allow"
-        Resource = "${aws_s3_bucket.main.arn}/*"
+        Resource = "${data.aws_s3_bucket.main.arn}/*"
       },
     ]
   })
@@ -254,7 +247,7 @@ resource "aws_instance" "updater" {
   user_data = <<-EOF
     #!/bin/bash
     mkdir -p /etc/anxiousbot
-    echo 'S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
+    echo 'S3BUCKET="${data.aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
     echo 'UPDATER_INDEX="${count.index}"' >> /etc/anxiousbot/.env
     echo 'CACHE_ENDPOINT="${aws_elasticache_cluster.cache_cluster.configuration_endpoint}"' >> /etc/anxiousbot/.env
   EOF
@@ -279,7 +272,7 @@ resource "aws_instance" "dealer" {
   user_data = <<-EOF
     #!/bin/bash
     mkdir -p /etc/anxiousbot
-    echo 'S3BUCKET="${aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
+    echo 'S3BUCKET="${data.aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
     echo 'CACHE_ENDPOINT="${aws_elasticache_cluster.cache_cluster.configuration_endpoint}"' >> /etc/anxiousbot/.env
   EOF
 

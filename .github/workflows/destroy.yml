@@ -26,10 +26,4 @@ jobs:
 
       - run: terraform init
 
-      - run: terraform refresh
-
-      - run: terraform state rm aws_s3_bucket.main
-
       - run: terraform apply -destroy -auto-approve
-
-      - run: terraform import aws_s3_bucket.main anxiousbot-main-bucket
