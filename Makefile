@@ -1,6 +1,7 @@
 .PHONY: deploy
 deploy:
 	cd deploy/terraform; \
+	terraform init; \
 	terraform import aws_s3_bucket.main anxiousbot-main-bucket; \
 	terraform apply -auto-approve; \
 	cd ../ansible; \
@@ -10,6 +11,7 @@ deploy:
 .PHONY: destroy
 destroy:
 	cd deploy/terraform; \
+	terraform init; \
 	terraform state rm aws_s3_bucket.main; \
 	terraform apply -destroy -auto-approve; \
 	cd ../..
