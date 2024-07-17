@@ -51,6 +51,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - run: echo "${{ secrets.VAULT_PASS }}" > .vault_pass
+      - run: echo "$VAULT_PASS" > .vault_pass
+        env:
+          VAULT_PASS: ${{ secrets.VAULT_PASS }}
+
+      - run: echo "$SSH_PRIVATE_KEY" > $HOME/.ssh/filipe.pem
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - run: ansible-playbook playbook-setup.yml
