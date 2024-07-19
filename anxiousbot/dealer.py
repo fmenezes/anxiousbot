@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import json
+import copy
 import os
 import sys
 import traceback
@@ -12,12 +13,45 @@ from pymemcache.client.base import Client as MemcacheClient
 from anxiousbot import App, closing
 from anxiousbot.log import get_logger
 
+class Deal:
+    def __init__(self, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids):
+        self.symbol = symbol
+        self.buy_exchange = buy_exchange
+        self.sell_exchange = sell_exchange
+        self.buy_asks = buy_asks
+        self.sell_bids = sell_bids
+        self.ts = datetime.now()
+        
+        # known after calculating
+        self.buy_price_min = 0
+        self.buy_price_max = 0
+        self.sell_price_min = 0
+        self.sell_price_max = 0
+        self.sell_orders = []
+        self.buy_orders = []
+        self.buy_total_quote = 0
+        self.buy_total_base = 0
+        self.sell_total_quote = 0
 
-class Dealer(App):
-    def _match_asks_bids(
-        self, balance, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids
-    ):
-        base_coin, quote_coin = symbol.split("/")
+    @staticmethod
+    def to_csv_header():
+        return [
+            "timestamp",
+            "symbol",
+            "profit",
+            "buy_exchange",
+            "buy_total_base",
+            "buy_total_quote",
+            "sell_exchange",
+            "sell_total_base",
+            "sell_total_quote",
+        ]
+
+    def _split_coin(self):
+        return self.symbol.split("/")
+
+    def calculate(self, balance):
+        base_coin, quote_coin = self._split_coin()
 
         if base_coin not in balance:
             balance[base_coin] = 0
@@ -28,15 +62,11 @@ class Dealer(App):
         buy_index = 0
         sell_index = 0
 
-        buy_price_max = buy_price_min = buy_asks[buy_index][0]
-        sell_price_max = sell_price_min = sell_bids[sell_index][0]
+        buy_asks = copy.deepcopy(self.buy_asks)
+        sell_bids = copy.deepcopy(self.sell_bids)
 
-        buy_orders = []
-        sell_orders = []
-
-        buy_total_quote = 0
-        buy_total_base = 0
-        sell_total_quote = 0
+        self.buy_price_max = self.buy_price_min = buy_asks[buy_index][0]
+        self.sell_price_max = self.sell_price_min = sell_bids[sell_index][0]
 
         while (
             balance[quote_coin] > 0
@@ -52,23 +82,23 @@ class Dealer(App):
 
             # Ensure buy price is less than or equal to sell price for a match
             if buy_price < sell_price:
-                buy_price_min = min(buy_price_min, buy_price)
-                buy_price_max = max(buy_price_max, buy_price)
+                self.buy_price_min = min(self.buy_price_min, buy_price)
+                self.buy_price_max = max(self.buy_price_max, buy_price)
 
-                sell_price_min = min(sell_price_min, sell_price)
-                sell_price_max = max(sell_price_max, sell_price)
+                self.sell_price_min = min(self.sell_price_min, sell_price)
+                self.sell_price_max = max(self.sell_price_max, sell_price)
 
                 matched_amount_base = min(
                     max_buyable_base, buy_amount_base, sell_amount_base
                 )
 
                 if matched_amount_base > 0:
-                    buy_orders += [buy_price, matched_amount_base]
-                    sell_orders += [sell_price, matched_amount_base]
+                    self.buy_orders += [buy_price, matched_amount_base]
+                    self.sell_orders += [sell_price, matched_amount_base]
 
-                    buy_total_base += matched_amount_base
-                    buy_total_quote += matched_amount_base * buy_price
-                    sell_total_quote += matched_amount_base * sell_price
+                    self.buy_total_base += matched_amount_base
+                    self.buy_total_quote += matched_amount_base * buy_price
+                    self.sell_total_quote += matched_amount_base * sell_price
 
                     # Update the amounts
                     buy_asks[buy_index][1] -= matched_amount_base
@@ -85,66 +115,138 @@ class Dealer(App):
                 # If the prices don't match, exit the loop
                 break
 
-        profit = sell_total_quote - buy_total_quote
-        profit_percentage = 0
-        if profit != 0:
-            profit = self.exchanges[sell_exchange].price_to_precision(symbol, profit)
-            profit_percentage = (profit / buy_total_quote) * 100
-        profit_percentage = float(
-            self.exchanges[sell_exchange].decimal_to_precision(
-                profit_percentage, precision=2
-            )
-        )
-        if buy_price_min != 0:
-            buy_price_min = self.exchanges[buy_exchange].price_to_precision(
-                symbol, buy_price_min
-            )
-        if buy_price_max != 0:
-            buy_price_max = self.exchanges[buy_exchange].price_to_precision(
-                symbol, buy_price_max
-            )
-        if buy_total_quote != 0:
-            buy_total_quote = self.exchanges[buy_exchange].amount_to_precision(
-                symbol, buy_total_quote
-            )
-        if buy_total_base != 0:
-            buy_total_base = self.exchanges[buy_exchange].amount_to_precision(
-                symbol, buy_total_base
-            )
-        if sell_price_min != 0:
-            sell_price_min = self.exchanges[sell_exchange].price_to_precision(
-                symbol, sell_price_min
-            )
-        if sell_price_max != 0:
-            sell_price_max = self.exchanges[sell_exchange].price_to_precision(
-                symbol, sell_price_max
-            )
-        if sell_total_quote != 0:
-            sell_total_quote = self.exchanges[sell_exchange].amount_to_precision(
-                symbol, sell_total_quote
-            )
+    @property
+    def profit(self):
+        return self.sell_total_quote - self.buy_total_quote
+
+    @property
+    def profit_percentage(self):
+        if self.buy_total_quote == 0:
+            return 0
+        return self.profit / self.buy_total_quote * 100
+
+    @property
+    def message(self):
+        base_coin, quote_coin = self._split_coin()
+        deal = self.results()
+        type = 'profit' if self.profit >= 0 else 'loss'
+        return f'Deal found, making a {type} of {deal["profit"]} {quote_coin}, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}'
+
+    def to_csv(self):
+        deal = self.results()
+
+        return [
+            deal["ts"],
+            deal["symbol"],
+            deal["profit"],
+            deal["buy"]["exchange"],
+            deal["buy"]["total_base"],
+            deal["buy"]["total_quote"],
+            deal["sell"]["exchange"],
+            deal["sell"]["total_base"],
+            deal["sell"]["total_quote"],
+        ]
+    
+    def to_dict(self):
+        deal = self.results()
 
         return {
-            "ts": str(datetime.now()),
+            "symbol": deal["symbol"],
+            "profit": deal["profit"],
+            "profit_percentage": deal["profit_percentage"],
+            "buy_exchange": deal["buy"]["exchange"],
+            "buy_total_base": deal["buy"]["total_base"],
+            "buy_total_quote": deal["buy"]["total_quote"],
+            "sell_exchange": deal["sell"]["exchange"],
+            "sell_total_base": deal["sell"]["total_base"],
+            "sell_total_quote": deal["sell"]["total_quote"],
+        }
+
+    def results(self):
+        profit = self.profit
+        try:
+            profit = self.sell_exchange.price_to_precision(self.symbol, profit)
+        except:
+            profit = f'{profit:2f}'
+        profit_percentage = self.profit_percentage
+        try:
+            profit_percentage = self.sell_exchange.decimal_to_precision(
+                    profit_percentage, precision=2
+                )
+        except:
+            profit_percentage = f'{profit_percentage:2f}'
+        buy_price_min = self.buy_price_min
+        try:
+            buy_price_min = self.buy_exchange.price_to_precision(
+                self.symbol, buy_price_min
+            )
+        except:
+            buy_price_min = f'{buy_price_min:2f}'
+        buy_price_max = self.buy_price_max
+        try:
+            buy_price_max = self.buy_exchange.price_to_precision(
+                self.symbol, buy_price_max
+            )
+        except:
+            buy_price_max = f'{buy_price_max:2f}'
+        buy_total_quote = self.buy_total_quote
+        try:
+            buy_total_quote = self.buy_exchange.amount_to_precision(
+                self.symbol, buy_total_quote
+            )
+        except:
+            buy_total_quote = f'{buy_total_quote:2f}'
+        buy_total_base = self.buy_total_base
+        try:
+            buy_total_base = self.buy_exchange.amount_to_precision(
+                self.symbol, buy_total_base
+            )
+        except:
+            buy_total_base = f'{buy_total_base:2f}'
+        sell_price_min = self.sell_price_min
+        try:
+            sell_price_min = self.sell_exchange.price_to_precision(
+                self.symbol, sell_price_min
+            )
+        except:
+            sell_price_min = f'{sell_price_min:2f}'
+        sell_price_max = self.sell_price_max
+        try:
+            sell_price_max = self.sell_exchange.price_to_precision(
+                self.symbol, sell_price_max
+            )
+        except:
+            sell_price_max = f'{sell_price_max:2f}'
+        sell_total_quote = self.sell_total_quote
+        try:
+            sell_total_quote = self.sell_exchange.amount_to_precision(
+                self.symbol, sell_total_quote
+            )
+        except:
+            sell_total_quote = f'{sell_total_quote:2f}'
+
+        return {
+            "ts": str(self.ts),
             "profit": profit,
             "profit_percentage": profit_percentage,
-            "symbol": symbol,
+            "symbol": self.symbol,
             "buy": {
-                "exchange": buy_exchange,
-                "orders": buy_orders,
+                "exchange": self.buy_exchange.id,
+                "orders": self.buy_orders,
                 "price": {"min": buy_price_min, "max": buy_price_max},
                 "total_quote": buy_total_quote,
                 "total_base": buy_total_base,
             },
             "sell": {
-                "exchange": sell_exchange,
-                "orders": sell_orders,
+                "exchange": self.sell_exchange.id,
+                "orders": self.sell_orders,
                 "price": {"min": sell_price_min, "max": sell_price_max},
                 "total_quote": sell_total_quote,
                 "total_base": buy_total_base,
             },
         }
 
+class Dealer(App):
     async def _watch_deals(self, symbol, clients, bot_queue):
         while True:
             try:
@@ -158,21 +260,19 @@ class Dealer(App):
                 }
 
                 deals = []
-                for buy_cilent_id, sell_client_id in [
+                for buy_client_id, sell_client_id in [
                     (a, b) for a in clients for b in clients if a != b
                 ]:
-                    asks = self.memcache_client.get(f"/asks/{symbol}/{buy_cilent_id}")
+                    asks = self.memcache_client.get(f"/asks/{symbol}/{buy_client_id}")
                     bids = self.memcache_client.get(f"/bids/{symbol}/{sell_client_id}")
                     if asks is None or len(asks) == 0:
                         continue
                     if bids is None or len(bids) == 0:
                         continue
-                    deals += [
-                        self._match_asks_bids(
-                            balance, symbol, buy_cilent_id, asks, sell_client_id, bids
-                        )
-                    ]
-                deals = [deal for deal in deals if deal["profit_percentage"] >= 1]
+                    deal = Deal(symbol, self.exchanges[buy_client_id], asks, self.exchanges[sell_client_id], bids)
+                    deal.calculate(balance)
+                    deals += [deal]
+                #deals = [deal for deal in deals if deal.profit_percentage >= 1]
                 self.logger.debug(f"found {len(deals)} deals", extra={"symbol": symbol})
                 if len(deals) > 0:
                     file_name = os.path.abspath(
@@ -183,48 +283,19 @@ class Dealer(App):
                         w = csv.writer(f)
                         if print_header:
                             w.writerow(
-                                [
-                                    "timestamp",
-                                    "symbol",
-                                    "profit",
-                                    "buy_exchange",
-                                    "buy_total_base",
-                                    "buy_total_quote",
-                                    "sell_exchange",
-                                    "sell_total_base",
-                                    "sell_total_quote",
-                                ]
+                                Deal.to_csv_header()
                             )
                         for deal in deals:
-                            row = [
-                                datetime.now(),
-                                deal["symbol"],
-                                deal["profit"],
-                                deal["buy"]["exchange"],
-                                deal["buy"]["total_base"],
-                                deal["buy"]["total_quote"],
-                                deal["sell"]["exchange"],
-                                deal["sell"]["total_base"],
-                                deal["sell"]["total_quote"],
-                            ]
-                            row = [str(col) for col in row]
+                            row = deal.to_csv()
                             w.writerow(row)
-                            base_coin, quote_coin = deal["symbol"].split("/")
-                            deal_msg = f'Deal found, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}, making a profit of {deal["profit"]} {quote_coin}'
                             self.logger.info(
-                                deal_msg,
+                                deal.message,
                                 extra={
                                     "type": "deal",
-                                    "symbol": deal["symbol"],
-                                    "exchange": deal["buy"]["exchange"],
-                                    "sell_exchange": deal["sell"]["exchange"],
-                                    "buy_quote": deal["buy"]["total_quote"],
-                                    "buy_base": deal["buy"]["total_base"],
-                                    "sell_quote": deal["sell"]["total_quote"],
-                                    "profit": deal["profit"],
+                                    **deal.to_dict()
                                 },
                             )
-                            bot_queue.put(deal_msg)
+                            bot_queue.put(deal.message)
 
                 await asyncio.sleep(0.5)
             except Exception as e:
