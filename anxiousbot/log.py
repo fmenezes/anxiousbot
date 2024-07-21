@@ -21,7 +21,7 @@ def get_logger(extra=None):
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
-    formatter = CustomJsonFormatter(timestamp=True, extra={'pid': os.getpid(), **extra})
+    formatter = CustomJsonFormatter(timestamp=True, extra={"pid": os.getpid(), **extra})
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger

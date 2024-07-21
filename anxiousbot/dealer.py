@@ -1,7 +1,7 @@
 import asyncio
+import copy
 import csv
 import json
-import copy
 import os
 import sys
 import traceback
@@ -13,6 +13,7 @@ from pymemcache.client.base import Client as MemcacheClient
 from anxiousbot import App, closing
 from anxiousbot.log import get_logger
 
+
 class Deal:
     def __init__(self, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids):
         self.symbol = symbol
@@ -21,7 +22,7 @@ class Deal:
         self.buy_asks = buy_asks
         self.sell_bids = sell_bids
         self.ts = datetime.now()
-        
+
         # known after calculating
         self.buy_price_min = 0
         self.buy_price_max = 0
@@ -129,8 +130,8 @@ class Deal:
     @property
     def message(self):
         base_coin, quote_coin = self._split_coin()
-        type = 'profit' if self.profit >= 0 else 'loss'
-        return f'Deal found, making a {type} of {self.format_profit()} {quote_coin}, at {self.buy_exchange.id} convert {self.format_buy_total_quote()} {quote_coin} to {self.format_buy_total_base()} {base_coin}, transfer to {self.sell_exchange.id} and finally sell back to {quote_coin} for {self.format_sell_total_quote()}'
+        type = "profit" if self.profit >= 0 else "loss"
+        return f"Deal found, making a {type} of {self.format_profit()} {quote_coin}, at {self.buy_exchange.id} convert {self.format_buy_total_quote()} {quote_coin} to {self.format_buy_total_base()} {base_coin}, transfer to {self.sell_exchange.id} and finally sell back to {quote_coin} for {self.format_sell_total_quote()}"
 
     def to_csv(self):
         return [
@@ -145,7 +146,7 @@ class Deal:
             self.format_buy_total_base(),
             self.format_sell_total_quote(),
         ]
-    
+
     def to_dict(self):
         return {
             "symbol": self.symbol,
@@ -162,74 +163,61 @@ class Deal:
         try:
             return self.sell_exchange.price_to_precision(self.symbol, self.profit)
         except:
-            return f'{self.profit:2f}'
+            return f"{self.profit:2f}"
 
     def format_profit_percentage(self):
         try:
             return self.sell_exchange.decimal_to_precision(
-                    self.profit_percentage, precision=2
-                )
+                self.profit_percentage, precision=2
+            )
         except:
-            return f'{self.profit_percentage:2f}'
+            return f"{self.profit_percentage:2f}"
 
     def format_buy_price_min(self):
         try:
-            return self.buy_exchange.price_to_precision(
-                    self.buy_price_min
-                )
+            return self.buy_exchange.price_to_precision(self.buy_price_min)
         except:
-            return f'{self.buy_price_min:2f}'
+            return f"{self.buy_price_min:2f}"
 
     def format_buy_price_max(self):
         try:
-            return self.buy_exchange.price_to_precision(
-                    self.buy_price_max
-                )
+            return self.buy_exchange.price_to_precision(self.buy_price_max)
         except:
-            return f'{self.buy_price_max:2f}'
+            return f"{self.buy_price_max:2f}"
 
     def format_buy_total_quote(self):
         try:
-            return self.buy_exchange.amount_to_precision(
-                    self.buy_total_quote
-                )
+            return self.buy_exchange.amount_to_precision(self.buy_total_quote)
         except:
-            return f'{self.buy_total_quote:2f}'
+            return f"{self.buy_total_quote:2f}"
 
     def format_buy_total_base(self):
         try:
-            return self.buy_exchange.amount_to_precision(
-                    self.buy_total_base
-                )
+            return self.buy_exchange.amount_to_precision(self.buy_total_base)
         except:
-            return f'{self.buy_total_base:2f}'
+            return f"{self.buy_total_base:2f}"
 
     def format_sell_price_min(self):
         try:
-            return self.sell_exchange.price_to_precision(
-                    self.sell_price_min
-                )
+            return self.sell_exchange.price_to_precision(self.sell_price_min)
         except:
-            return f'{self.sell_price_min:2f}'
+            return f"{self.sell_price_min:2f}"
 
     def format_sell_price_max(self):
         try:
-            return self.sell_exchange.price_to_precision(
-                    self.sell_price_max
-                )
+            return self.sell_exchange.price_to_precision(self.sell_price_max)
         except:
-            return f'{self.sell_price_max:2f}'
+            return f"{self.sell_price_max:2f}"
 
     def format_sell_total_quote(self):
         try:
-            return self.sell_exchange.amount_to_precision(
-                    self.sell_total_quote
-                )
+            return self.sell_exchange.amount_to_precision(self.sell_total_quote)
         except:
-            return f'{self.sell_total_quote:2f}'
+            return f"{self.sell_total_quote:2f}"
 
     def format_ts(self):
         return str(self.ts)
+
 
 class Dealer(App):
     async def _watch_deals(self, symbol, clients, bot_queue):
@@ -254,7 +242,13 @@ class Dealer(App):
                         continue
                     if bids is None or len(bids) == 0:
                         continue
-                    deal = Deal(symbol, self.exchanges[buy_client_id], asks, self.exchanges[sell_client_id], bids)
+                    deal = Deal(
+                        symbol,
+                        self.exchanges[buy_client_id],
+                        asks,
+                        self.exchanges[sell_client_id],
+                        bids,
+                    )
                     deal.calculate(balance)
                     deals += [deal]
                 deals = [deal for deal in deals if deal.profit_percentage >= 1]
@@ -267,18 +261,13 @@ class Dealer(App):
                     with open(file_name, "a") as f:
                         w = csv.writer(f)
                         if print_header:
-                            w.writerow(
-                                Deal.to_csv_header()
-                            )
+                            w.writerow(Deal.to_csv_header())
                         for deal in deals:
                             row = deal.to_csv()
                             w.writerow(row)
                             self.logger.info(
                                 deal.message,
-                                extra={
-                                    "type": "deal",
-                                    **deal.to_dict()
-                                },
+                                extra={"type": "deal", **deal.to_dict()},
                             )
                             bot_queue.put(deal.message)
 
