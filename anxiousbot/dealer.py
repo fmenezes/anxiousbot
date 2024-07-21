@@ -39,6 +39,7 @@ class Deal:
             "timestamp",
             "symbol",
             "profit",
+            "profit_percentage",
             "buy_exchange",
             "buy_total_base",
             "buy_total_quote",
@@ -128,123 +129,107 @@ class Deal:
     @property
     def message(self):
         base_coin, quote_coin = self._split_coin()
-        deal = self.results()
         type = 'profit' if self.profit >= 0 else 'loss'
-        return f'Deal found, making a {type} of {deal["profit"]} {quote_coin}, at {deal["buy"]["exchange"]} convert {deal["buy"]["total_quote"]} {quote_coin} to {deal["buy"]["total_base"]} {base_coin}, transfer to {deal["sell"]["exchange"]} and finally sell back to {quote_coin} for {deal["sell"]["total_quote"]}'
+        return f'Deal found, making a {type} of {self.format_profit()} {quote_coin}, at {self.buy_exchange.id} convert {self.format_buy_total_quote()} {quote_coin} to {self.format_buy_total_base()} {base_coin}, transfer to {self.sell_exchange.id} and finally sell back to {quote_coin} for {self.format_sell_total_quote()}'
 
     def to_csv(self):
-        deal = self.results()
-
         return [
-            deal["ts"],
-            deal["symbol"],
-            deal["profit"],
-            deal["buy"]["exchange"],
-            deal["buy"]["total_base"],
-            deal["buy"]["total_quote"],
-            deal["sell"]["exchange"],
-            deal["sell"]["total_base"],
-            deal["sell"]["total_quote"],
+            self.format_ts(),
+            self.symbol,
+            self.format_profit(),
+            self.format_profit_percentage(),
+            self.buy_exchange.id,
+            self.format_buy_total_base(),
+            self.format_buy_total_quote(),
+            self.sell_exchange.id,
+            self.format_buy_total_base(),
+            self.format_sell_total_quote(),
         ]
     
     def to_dict(self):
-        deal = self.results()
-
         return {
-            "symbol": deal["symbol"],
-            "profit": deal["profit"],
-            "profit_percentage": deal["profit_percentage"],
-            "buy_exchange": deal["buy"]["exchange"],
-            "buy_total_base": deal["buy"]["total_base"],
-            "buy_total_quote": deal["buy"]["total_quote"],
-            "sell_exchange": deal["sell"]["exchange"],
-            "sell_total_base": deal["sell"]["total_base"],
-            "sell_total_quote": deal["sell"]["total_quote"],
+            "symbol": self.symbol,
+            "profit": self.format_profit(),
+            "profit_percentage": self.format_profit_percentage(),
+            "buy_exchange": self.buy_exchange.id,
+            "buy_total_base": self.format_buy_total_base(),
+            "buy_total_quote": self.format_buy_total_quote(),
+            "sell_exchange": self.sell_exchange.id,
+            "sell_total_quote": self.format_sell_total_quote(),
         }
 
-    def results(self):
-        profit = self.profit
+    def format_profit(self):
         try:
-            profit = self.sell_exchange.price_to_precision(self.symbol, profit)
+            return self.sell_exchange.price_to_precision(self.symbol, self.profit)
         except:
-            profit = f'{profit:2f}'
-        profit_percentage = self.profit_percentage
+            return f'{self.profit:2f}'
+
+    def format_profit_percentage(self):
         try:
-            profit_percentage = self.sell_exchange.decimal_to_precision(
-                    profit_percentage, precision=2
+            return self.sell_exchange.decimal_to_precision(
+                    self.profit_percentage, precision=2
                 )
         except:
-            profit_percentage = f'{profit_percentage:2f}'
-        buy_price_min = self.buy_price_min
-        try:
-            buy_price_min = self.buy_exchange.price_to_precision(
-                self.symbol, buy_price_min
-            )
-        except:
-            buy_price_min = f'{buy_price_min:2f}'
-        buy_price_max = self.buy_price_max
-        try:
-            buy_price_max = self.buy_exchange.price_to_precision(
-                self.symbol, buy_price_max
-            )
-        except:
-            buy_price_max = f'{buy_price_max:2f}'
-        buy_total_quote = self.buy_total_quote
-        try:
-            buy_total_quote = self.buy_exchange.amount_to_precision(
-                self.symbol, buy_total_quote
-            )
-        except:
-            buy_total_quote = f'{buy_total_quote:2f}'
-        buy_total_base = self.buy_total_base
-        try:
-            buy_total_base = self.buy_exchange.amount_to_precision(
-                self.symbol, buy_total_base
-            )
-        except:
-            buy_total_base = f'{buy_total_base:2f}'
-        sell_price_min = self.sell_price_min
-        try:
-            sell_price_min = self.sell_exchange.price_to_precision(
-                self.symbol, sell_price_min
-            )
-        except:
-            sell_price_min = f'{sell_price_min:2f}'
-        sell_price_max = self.sell_price_max
-        try:
-            sell_price_max = self.sell_exchange.price_to_precision(
-                self.symbol, sell_price_max
-            )
-        except:
-            sell_price_max = f'{sell_price_max:2f}'
-        sell_total_quote = self.sell_total_quote
-        try:
-            sell_total_quote = self.sell_exchange.amount_to_precision(
-                self.symbol, sell_total_quote
-            )
-        except:
-            sell_total_quote = f'{sell_total_quote:2f}'
+            return f'{self.profit_percentage:2f}'
 
-        return {
-            "ts": str(self.ts),
-            "profit": profit,
-            "profit_percentage": profit_percentage,
-            "symbol": self.symbol,
-            "buy": {
-                "exchange": self.buy_exchange.id,
-                "orders": self.buy_orders,
-                "price": {"min": buy_price_min, "max": buy_price_max},
-                "total_quote": buy_total_quote,
-                "total_base": buy_total_base,
-            },
-            "sell": {
-                "exchange": self.sell_exchange.id,
-                "orders": self.sell_orders,
-                "price": {"min": sell_price_min, "max": sell_price_max},
-                "total_quote": sell_total_quote,
-                "total_base": buy_total_base,
-            },
-        }
+    def format_buy_price_min(self):
+        try:
+            return self.buy_exchange.price_to_precision(
+                    self.buy_price_min
+                )
+        except:
+            return f'{self.buy_price_min:2f}'
+
+    def format_buy_price_max(self):
+        try:
+            return self.buy_exchange.price_to_precision(
+                    self.buy_price_max
+                )
+        except:
+            return f'{self.buy_price_max:2f}'
+
+    def format_buy_total_quote(self):
+        try:
+            return self.buy_exchange.amount_to_precision(
+                    self.buy_total_quote
+                )
+        except:
+            return f'{self.buy_total_quote:2f}'
+
+    def format_buy_total_base(self):
+        try:
+            return self.buy_exchange.amount_to_precision(
+                    self.buy_total_base
+                )
+        except:
+            return f'{self.buy_total_base:2f}'
+
+    def format_sell_price_min(self):
+        try:
+            return self.sell_exchange.price_to_precision(
+                    self.sell_price_min
+                )
+        except:
+            return f'{self.sell_price_min:2f}'
+
+    def format_sell_price_max(self):
+        try:
+            return self.sell_exchange.price_to_precision(
+                    self.sell_price_max
+                )
+        except:
+            return f'{self.sell_price_max:2f}'
+
+    def format_sell_total_quote(self):
+        try:
+            return self.sell_exchange.amount_to_precision(
+                    self.sell_total_quote
+                )
+        except:
+            return f'{self.sell_total_quote:2f}'
+
+    def format_ts(self):
+        return str(self.ts)
 
 class Dealer(App):
     async def _watch_deals(self, symbol, clients, bot_queue):
@@ -272,7 +257,7 @@ class Dealer(App):
                     deal = Deal(symbol, self.exchanges[buy_client_id], asks, self.exchanges[sell_client_id], bids)
                     deal.calculate(balance)
                     deals += [deal]
-                #deals = [deal for deal in deals if deal.profit_percentage >= 1]
+                deals = [deal for deal in deals if deal.profit_percentage >= 1]
                 self.logger.debug(f"found {len(deals)} deals", extra={"symbol": symbol})
                 if len(deals) > 0:
                     file_name = os.path.abspath(
