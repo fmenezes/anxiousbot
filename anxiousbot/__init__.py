@@ -57,27 +57,10 @@ class App:
                 last_exception = e
         raise last_exception
 
-    def _convert_exchange_id_for_auth(self, id):
-        data = {
-            "coinbaseexchange": "coinbase",
-            "coinbaseinternational": "coinbase",
-            "binanceusdm": "binance",
-            "binancecoinm": "binance",
-        }
-
-        if id in data:
-            return data[id]
-
-        if id.endswith("futures"):
-            return id.removesuffix("futures")
-
-        return id
-
     async def setup_exchange(self, exchange_id, required_markets=False):
-        env_exchange_id = self._convert_exchange_id_for_auth(exchange_id).upper()
-        api_key = os.getenv(f"{env_exchange_id}_API_KEY")
-        secret = os.getenv(f"{env_exchange_id}_SECRET")
-        passphrase = os.getenv(f"{env_exchange_id}_PASSPHRASE")
+        api_key = os.getenv(f"{exchange_id.upper()}_API_KEY")
+        secret = os.getenv(f"{exchange_id.upper()}_SECRET")
+        passphrase = os.getenv(f"{exchange_id.upper()}_PASSPHRASE")
         auth = None
         if api_key is not None or secret is not None or passphrase is not None:
             auth = {
