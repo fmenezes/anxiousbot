@@ -3,7 +3,6 @@ import asyncio
 
 from dotenv import load_dotenv
 
-from anxiousbot import run_uv_loop
 from anxiousbot.dealer import run as dealer_run
 from anxiousbot.notifier import run as notifier_run
 from anxiousbot.updater import run as updater_run
@@ -18,9 +17,9 @@ def _main():
     updater_parser = subparsers.add_parser("updater", help="Run the updater")
     args = parser.parse_args()
     if args.command == "dealer":
-        return run_uv_loop(dealer_notifier_run)
+        return asyncio.run(dealer_notifier_run)
     elif args.command == "updater":
-        return run_uv_loop(updater_run)
+        return asyncio.run(updater_run)
     parser.print_help()
     return 1
 

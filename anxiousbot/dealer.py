@@ -10,8 +10,7 @@ from datetime import datetime
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
-from anxiousbot import App, closing, split_coin
-from anxiousbot.log import get_logger
+from anxiousbot import App, closing, get_logger, split_coin
 
 
 class Deal:

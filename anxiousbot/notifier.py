@@ -5,8 +5,7 @@ import traceback
 
 from telegram import Bot
 
-from anxiousbot import App, closing, run_uv_loop
-from anxiousbot.log import get_logger
+from anxiousbot import App, closing, get_logger
 
 
 class Notifier(App):

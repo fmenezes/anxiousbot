@@ -7,8 +7,7 @@ import traceback
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
-from anxiousbot import App, closing
-from anxiousbot.log import get_logger
+from anxiousbot import App, closing, get_logger
 
 DEFAULT_EXPIRE_BOOK_ORDERS = 60
 

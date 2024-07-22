@@ -1,27 +1,43 @@
 import asyncio
+import logging
 import os
-import sys
 from contextlib import asynccontextmanager
 
 import ccxt.pro as ccxt
-import uvloop
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
+from pythonjsonlogger import jsonlogger
 
-from anxiousbot.log import get_logger
+
+class CustomJsonFormatter(jsonlogger.JsonFormatter):
+    def __init__(self, extra=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._extra = extra
+
+    def add_fields(self, log_record, record, message_dict):
+        super().add_fields(log_record, record, message_dict)
+        log_record["levelname"] = record.levelname
+        if self._extra is not None:
+            for key, value in self._extra.items():
+                log_record[key] = value
+
+
+def get_logger(name=None, extra=None):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    if extra is None:
+        extra = {}
+    formatter = CustomJsonFormatter(
+        timestamp=True, extra={"pid": os.getpid(), "app": name, **extra}
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
 
 
 def split_coin(symbol):
     return symbol.split("/")
-
-
-def run_uv_loop(run_fn, *args, **kwargs):
-    if sys.version_info >= (3, 11):
-        with asyncio.Runner(loop_factory=uvloop.new_event_loop) as runner:
-            return runner.run(run_fn(*args, **kwargs))
-    else:
-        uvloop.install()
-        return asyncio.run(run_fn(*args, **kwargs))
 
 
 @asynccontextmanager
