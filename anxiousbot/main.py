@@ -1,12 +1,12 @@
 import argparse
-import multiprocessing
+import asyncio
 
 from dotenv import load_dotenv
 
+from anxiousbot import run_uv_loop
 from anxiousbot.dealer import run as dealer_run
-from anxiousbot.notifier import NotifierProcess
+from anxiousbot.notifier import run as notifier_run
 from anxiousbot.updater import run as updater_run
-from anxiousbot.util import run_uv_loop
 
 
 def _main():
@@ -26,12 +26,12 @@ def _main():
 
 
 async def dealer_notifier_run():
-    bot_queue = multiprocessing.Queue()
-    n = NotifierProcess(bot_queue)
-    n.start()
+    bot_queue = asyncio.Queue()
 
-    await dealer_run(bot_queue)
-    return n.wait()
+    tasks = []
+    tasks += [dealer_run(bot_queue), notifier_run(bot_queue)]
+
+    return await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":

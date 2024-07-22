@@ -17,11 +17,15 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
                 log_record[key] = value
 
 
-def get_logger(extra=None):
-    logger = logging.getLogger(__name__)
+def get_logger(name=None, extra=None):
+    logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
-    formatter = CustomJsonFormatter(timestamp=True, extra={"pid": os.getpid(), **extra})
+    if extra is None:
+        extra = {}
+    formatter = CustomJsonFormatter(
+        timestamp=True, extra={"pid": os.getpid(), "app": name, **extra}
+    )
     handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger

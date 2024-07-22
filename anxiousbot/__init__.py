@@ -1,12 +1,27 @@
 import asyncio
 import os
+import sys
 from contextlib import asynccontextmanager
 
 import ccxt.pro as ccxt
+import uvloop
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
 from anxiousbot.log import get_logger
+
+
+def split_coin(symbol):
+    return symbol.split("/")
+
+
+def run_uv_loop(run_fn, *args, **kwargs):
+    if sys.version_info >= (3, 11):
+        with asyncio.Runner(loop_factory=uvloop.new_event_loop) as runner:
+            return runner.run(run_fn(*args, **kwargs))
+    else:
+        uvloop.install()
+        return asyncio.run(run_fn(*args, **kwargs))
 
 
 @asynccontextmanager

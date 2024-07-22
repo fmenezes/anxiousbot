@@ -10,7 +10,7 @@ from datetime import datetime
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
-from anxiousbot import App, closing
+from anxiousbot import App, closing, split_coin
 from anxiousbot.log import get_logger
 
 
@@ -34,26 +34,8 @@ class Deal:
         self.buy_total_base = 0
         self.sell_total_quote = 0
 
-    @staticmethod
-    def to_csv_header():
-        return [
-            "timestamp",
-            "symbol",
-            "profit",
-            "profit_percentage",
-            "buy_exchange",
-            "buy_total_base",
-            "buy_total_quote",
-            "sell_exchange",
-            "sell_total_base",
-            "sell_total_quote",
-        ]
-
-    def _split_coin(self):
-        return self.symbol.split("/")
-
     def calculate(self, balance):
-        base_coin, quote_coin = self._split_coin()
+        base_coin, quote_coin = split_coin(self.symbol)
 
         if base_coin not in balance:
             balance[base_coin] = 0
@@ -128,27 +110,13 @@ class Deal:
         return self.profit / self.buy_total_quote * 100
 
     @property
-    def message(self):
-        base_coin, quote_coin = self._split_coin()
-        type = "profit" if self.profit >= 0 else "loss"
-        return f"Deal found, making a {type} of {self.format_profit()} {quote_coin}, at {self.buy_exchange.id} convert {self.format_buy_total_quote()} {quote_coin} to {self.format_buy_total_base()} {base_coin}, transfer to {self.sell_exchange.id} and finally sell back to {quote_coin} for {self.format_sell_total_quote()}"
-
-    def to_csv(self):
-        return [
-            self.format_ts(),
-            self.symbol,
-            self.format_profit(),
-            self.format_profit_percentage(),
-            self.buy_exchange.id,
-            self.format_buy_total_base(),
-            self.format_buy_total_quote(),
-            self.sell_exchange.id,
-            self.format_buy_total_base(),
-            self.format_sell_total_quote(),
-        ]
+    def threshold(self):
+        return self.profit > 0
+        # return self.profit_percentage >= 1
 
     def to_dict(self):
         return {
+            "ts": self.format_ts(),
             "symbol": self.symbol,
             "profit": self.format_profit(),
             "profit_percentage": self.format_profit_percentage(),
@@ -157,6 +125,7 @@ class Deal:
             "buy_total_quote": self.format_buy_total_quote(),
             "sell_exchange": self.sell_exchange.id,
             "sell_total_quote": self.format_sell_total_quote(),
+            "threshold": self.threshold,
         }
 
     def format_profit(self):
@@ -220,6 +189,104 @@ class Deal:
 
 
 class Dealer(App):
+    def _write_deal_xml(self, deal_event):
+        if deal_event["type"] != "close":
+            return
+        file_name = os.path.abspath(
+            f"data/deals_{deal_event['symbol'].replace('/', '-')}_{datetime.fromisoformat(deal_event['ts']).strftime('%Y-%m-%d')}.csv"
+        )
+        print_header = not os.path.exists(file_name)
+        with open(file_name, "a") as f:
+            w = csv.writer(f)
+            if print_header:
+                w.writerow(
+                    [
+                        "ts",
+                        "ts_open",
+                        "ts_close",
+                        "symbol",
+                        "profit",
+                        "profit_percentage",
+                        "buy_exchange",
+                        "buy_total_quote",
+                        "buy_total_base",
+                        "sell_exchange",
+                        "sell_total_quote",
+                    ]
+                )
+
+            row = [
+                deal_event.get("ts"),
+                deal_event.get("ts_open"),
+                deal_event.get("ts_close"),
+                deal_event.get("symbol"),
+                deal_event.get("profit"),
+                deal_event.get("profit_percentage"),
+                deal_event.get("buy_exchange"),
+                deal_event.get("buy_total_quote"),
+                deal_event.get("buy_total_base"),
+                deal_event.get("sell_exchange"),
+                deal_event.get("sell_total_quote"),
+            ]
+            w.writerow(row)
+
+    def _log_deal_event(self, deal_event):
+        self.logger.info(
+            deal_event["message"],
+            extra={"type": "deal", **{**deal_event, "message": None}},
+        )
+
+    async def _process_deal(self, deal, bot_queue):
+        current_event = self.memcache_client.get(
+            f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
+            {"ts_open": str(datetime.now()), "type": "noop", "threshold": False},
+        )
+        new_event = deal.to_dict()
+
+        new_event["ts_open"] = current_event["ts_open"]
+        if current_event["threshold"] == new_event["threshold"]:
+            new_event["type"] = "update" if new_event["threshold"] == True else "noop"
+        else:
+            if new_event["threshold"] == True:
+                new_event["type"] = "open"
+                new_event["ts_open"] = new_event["ts"]
+            else:
+                new_event = {
+                    **current_event,
+                    "ts_close": current_event["ts"],
+                    "type": "close",
+                }
+        new_event["duration"] = str(
+            datetime.fromisoformat(new_event["ts"])
+            - datetime.fromisoformat(new_event["ts_open"])
+        )
+
+        base_coin, quote_coin = split_coin(deal.symbol)
+        if new_event["type"] != "noop":
+            match new_event["type"]:
+                case "open":
+                    event_type = "opened"
+                case "close":
+                    event_type = "closed"
+                case "update":
+                    event_type = "updated"
+            gain_type = "profit" if self.profit >= 0 else "loss"
+
+            new_event["message"] = (
+                f"Deal {event_type}, making a {gain_type} of {new_event['profit']} {quote_coin}, at {new_event['buy_exchange']} convert {new_event['buy_total_quote']} {quote_coin} to {new_event['buy_total_base']} {base_coin}, transfer to {new_event['sell_exchange']} and finally sell back to {quote_coin} for {new_event['sell_total_quote']}, took {new_event['duration']}"
+            )
+
+        self.memcache_client.set(
+            f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
+            new_event,
+            expire=60,
+        )
+
+        if new_event["type"] != "noop":
+            self._log_deal_event(new_event)
+            self._write_deal_xml(new_event)
+            await bot_queue.put(new_event)
+
     async def _watch_deals(self, symbol, clients, bot_queue):
         while True:
             try:
@@ -232,7 +299,6 @@ class Dealer(App):
                     quote_coin: self.memcache_client.get(f"/balance/{quote_coin}", 0.0),
                 }
 
-                deals = []
                 for buy_client_id, sell_client_id in [
                     (a, b) for a in clients for b in clients if a != b
                 ]:
@@ -250,26 +316,7 @@ class Dealer(App):
                         bids,
                     )
                     deal.calculate(balance)
-                    deals += [deal]
-                deals = [deal for deal in deals if deal.profit_percentage >= 1]
-                self.logger.debug(f"found {len(deals)} deals", extra={"symbol": symbol})
-                if len(deals) > 0:
-                    file_name = os.path.abspath(
-                        f"data/deals_{symbol.replace('/', '-')}_{datetime.now().strftime('%Y-%m-%d')}.csv"
-                    )
-                    print_header = not os.path.exists(file_name)
-                    with open(file_name, "a") as f:
-                        w = csv.writer(f)
-                        if print_header:
-                            w.writerow(Deal.to_csv_header())
-                        for deal in deals:
-                            row = deal.to_csv()
-                            w.writerow(row)
-                            self.logger.info(
-                                deal.message,
-                                extra={"type": "deal", **deal.to_dict()},
-                            )
-                            bot_queue.put(deal.message)
+                    await self._process_deal(deal, bot_queue)
 
                 await asyncio.sleep(0.5)
             except Exception as e:
@@ -284,17 +331,7 @@ class Dealer(App):
             all_exchanges += exchanges
         all_exchanges = list(set(all_exchanges))
         for exchange_id in all_exchanges:
-            try:
-                self.exchanges[exchange_id] = await self.setup_exchange(
-                    exchange_id, True
-                )
-            except Exception as e:
-                self.logger.exception(
-                    e,
-                    extra={
-                        "exchange": exchange_id,
-                    },
-                )
+            self.exchanges[exchange_id] = await self.setup_exchange(exchange_id)
 
     async def run(self, config, bot_queue):
         await self._init_exchanges(config)
@@ -313,7 +350,7 @@ async def run(bot_queue):
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
 
-    logger = get_logger(extra={"app": "dealer"})
+    logger = get_logger(name="dealer")
 
     def handle_exception(exc_type, exc_value, exc_traceback):
         logger.exception(traceback.format_exception(exc_type, exc_value, exc_traceback))

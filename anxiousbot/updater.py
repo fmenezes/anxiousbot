@@ -86,7 +86,7 @@ async def run():
 
     with open(CONFIG_PATH, "r") as f:
         config = json.load(f)
-    logger = get_logger({"app": "updater", "config": UPDATER_INDEX})
+    logger = get_logger(name="updater", extra={"config": UPDATER_INDEX})
 
     def handle_exception(exc_type, exc_value, exc_traceback):
         logger.exception(traceback.format_exception(exc_type, exc_value, exc_traceback))
