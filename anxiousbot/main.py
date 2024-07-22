@@ -17,9 +17,9 @@ def _main():
     updater_parser = subparsers.add_parser("updater", help="Run the updater")
     args = parser.parse_args()
     if args.command == "dealer":
-        return asyncio.run(dealer_notifier_run)
+        return asyncio.run(dealer_notifier_run())
     elif args.command == "updater":
-        return asyncio.run(updater_run)
+        return asyncio.run(updater_run())
     parser.print_help()
     return 1
 
