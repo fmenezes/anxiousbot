@@ -222,7 +222,7 @@ async def _run():
     data = list(_filter_symbols_in_exchanges(data, filtered_symbols))
     data = _filter_exchanges(data)
     data = list(_split_batches(data))
-    data = _split_machines(data)
+    data = _split_machines(data, 45)
     symbols_exchanges = dict(
         [(entry["symbol"], entry["exchanges"]) for entry in filtered_symbol_list]
     )

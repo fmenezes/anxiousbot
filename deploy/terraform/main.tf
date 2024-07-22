@@ -237,7 +237,7 @@ resource "aws_elasticache_cluster" "cache_cluster" {
 resource "aws_instance" "updater" {
   count                       = length(local.config.updater)
   ami                         = "ami-01b799c439fd5516a"
-  instance_type               = "t2.medium"
+  instance_type               = "t2.small"
   subnet_id                   = aws_subnet.main.id
   vpc_security_group_ids      = [aws_security_group.allow_ssh.id]
   associate_public_ip_address = true
