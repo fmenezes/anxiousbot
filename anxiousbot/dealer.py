@@ -202,9 +202,10 @@ class Dealer(App):
                 w.writerow(
                     [
                         "ts",
+                        "symbol",
                         "ts_open",
                         "ts_close",
-                        "symbol",
+                        "duration",
                         "profit",
                         "profit_percentage",
                         "buy_exchange",
@@ -217,9 +218,10 @@ class Dealer(App):
 
             row = [
                 deal_event.get("ts"),
+                deal_event.get("symbol"),
                 deal_event.get("ts_open"),
                 deal_event.get("ts_close"),
-                deal_event.get("symbol"),
+                deal_event.get("duration"),
                 deal_event.get("profit"),
                 deal_event.get("profit_percentage"),
                 deal_event.get("buy_exchange"),
