@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
 jobs:
   terraform:
+    concurrency:
+      group: terraform
     runs-on: ubuntu-latest
     defaults:
       run:
