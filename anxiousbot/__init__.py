@@ -30,10 +30,10 @@ def _get_log_handler(extra=None):
 def _log_record_factory(log_factory, extra):
     def _factory(*args, **kwargs):
         record = log_factory(*args, **kwargs)
-        if not hasattr(record, 'taskName'):
-            setattr(record, 'taskName', None)
-        for key, value in extra.items():
-            setattr(record, key, value)
+        record.taskName = getattr(record, "taskName", None)
+        if extra is not None:
+            for key, value in extra.items():
+                setattr(record, key, value)
         return record
 
     return _factory
@@ -41,10 +41,9 @@ def _log_record_factory(log_factory, extra):
 
 def get_logger(name=None, extra=None):
     logger = logging.getLogger(name)
-    if extra is not None:
-        logging.setLogRecordFactory(
-            _log_record_factory(logging.getLogRecordFactory(), extra)
-        )
+    logging.setLogRecordFactory(
+        _log_record_factory(logging.getLogRecordFactory(), extra)
+    )
     try:
         level = getattr(logging, os.getenv("LOG_LEVEL", "INFO"))
     except:
