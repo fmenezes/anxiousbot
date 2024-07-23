@@ -13,7 +13,7 @@ from watchtower import CloudWatchLogHandler
 def _get_log_handler(extra=None):
     if os.getenv("LOG_HANDLER", "STDOUT") == "CLOUD_WATCH":
         handler = CloudWatchLogHandler(
-            boto3_client=boto3.client("logs", region=os.getenv("AWS_REGION")),
+            boto3_client=boto3.client("logs", region_name=os.getenv("AWS_REGION")),
             log_group=os.getenv("LOG_GROUP_NAME"),
             stream_name=os.getenv("LOG_STREAM_NAME"),
         )
