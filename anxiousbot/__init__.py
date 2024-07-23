@@ -7,10 +7,22 @@ import boto3
 import ccxt.pro as ccxt
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
-from watchtower import CloudWatchLogHandler
+from watchtower import CloudWatchLogFormatter, CloudWatchLogHandler
+
+
+class CustomFormatter(CloudWatchLogFormatter):
+    def format(self, message):
+        for attr in self.add_log_record_attrs:
+            if not hasattr(message, attr):
+                setattr(message, attr, None)
+        return super().format(message)
 
 
 def _get_log_handler(extra=None):
+    attrs = ["name", "levelname", "taskName", "exchange", "duration", "symbol"]
+    if extra is not None:
+        attrs += extra.keys()
+    formatter = CustomFormatter(add_log_record_attrs=attrs)
     if os.getenv("LOG_HANDLER", "STDOUT") == "CLOUD_WATCH":
         handler = CloudWatchLogHandler(
             boto3_client=boto3.client("logs", region_name=os.getenv("AWS_REGION")),
@@ -18,12 +30,9 @@ def _get_log_handler(extra=None):
             log_group=os.getenv("LOG_GROUP_NAME"),
             stream_name=os.getenv("LOG_STREAM_NAME"),
         )
-        attrs = ["name", "levelname", "taskName", "exchange", "duration", "symbol"]
-        if extra is not None:
-            attrs += extra.keys()
-        handler.formatter.add_log_record_attrs = attrs
     else:
         handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
 
     return handler
 
@@ -38,12 +47,6 @@ def _log_record_factory(log_factory=None, extra=None):
             record.taskName = asyncio.current_task().get_name()
         except Exception:
             record.taskName = None
-        if not hasattr(record, "exchange"):
-            record.exchange = None
-        if not hasattr(record, "duration"):
-            record.duration = None
-        if not hasattr(record, "symbol"):
-            record.symbol = None
         if extra is not None:
             for key, value in extra.items():
                 setattr(record, key, value)
