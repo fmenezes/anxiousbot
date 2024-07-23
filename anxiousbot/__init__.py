@@ -30,6 +30,8 @@ def _get_log_handler(extra=None):
 def _log_record_factory(log_factory, extra):
     def _factory(*args, **kwargs):
         record = log_factory(*args, **kwargs)
+        if not hasattr(record, 'taskName'):
+            setattr(record, 'taskName', None)
         for key, value in extra.items():
             setattr(record, key, value)
         return record
