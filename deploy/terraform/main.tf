@@ -253,7 +253,7 @@ resource "aws_instance" "updater" {
   EOF
 
   tags = {
-    Name    = "anxiousbot-updater-${count.index + 1}"
+    Name    = "anxiousbot-updater-${count.index}"
     Role    = "updater"
     Project = "anxiousbot"
   }
