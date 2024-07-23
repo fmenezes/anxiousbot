@@ -233,8 +233,7 @@ class Dealer(App):
 
     def _log_deal_event(self, deal_event):
         self.logger.info(
-            deal_event["message"],
-            extra={"type": "deal", **{**deal_event, "message": None}},
+            {"type": "deal", **deal_event},
         )
 
     async def _process_deal(self, deal, bot_queue):

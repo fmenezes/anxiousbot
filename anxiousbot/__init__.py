@@ -18,7 +18,7 @@ def _get_log_handler(extra=None):
             log_group=os.getenv("LOG_GROUP_NAME"),
             stream_name=os.getenv("LOG_STREAM_NAME"),
         )
-        attrs = ["name", "levelname", "taskName", "exchange", "duration"]
+        attrs = ["name", "levelname", "taskName", "exchange", "duration", "symbol"]
         if extra is not None:
             attrs += extra.keys()
         handler.formatter.add_log_record_attrs = attrs
@@ -42,6 +42,8 @@ def _log_record_factory(log_factory=None, extra=None):
             record.exchange = None
         if not hasattr(record, "duration"):
             record.duration = None
+        if not hasattr(record, "symbol"):
+            record.symbol = None
         if extra is not None:
             for key, value in extra.items():
                 setattr(record, key, value)
