@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import traceback
+from datetime import datetime
 
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
@@ -26,6 +27,7 @@ class Updater(App):
                     )
                 ) as client:
                     while True:
+                        start = datetime.now()
                         param = setting["symbols"]
                         match setting["mode"]:
                             case "single":
@@ -53,6 +55,14 @@ class Updater(App):
                                 order_book["bids"],
                                 expire=self.expire_book_orders,
                             )
+                        duration = datetime.now() - start
+                        self.logger.debug(
+                            f"Updated {setting['exchange']} in {duration}",
+                            extra={
+                                "exchange": setting["exchange"],
+                                "duration": duration,
+                            },
+                        )
             except Exception as e:
                 self.logger.exception(e, extra={"exchange": setting["exchange"]})
             self.logger.debug(

@@ -18,7 +18,7 @@ def _get_log_handler(extra=None):
             log_group=os.getenv("LOG_GROUP_NAME"),
             stream_name=os.getenv("LOG_STREAM_NAME"),
         )
-        attrs = ["name", "levelname", "taskName"]
+        attrs = ["name", "levelname", "taskName", "exchange", "duration"]
         if extra is not None:
             attrs += extra.keys()
         handler.formatter.add_log_record_attrs = attrs
@@ -31,12 +31,17 @@ def _get_log_handler(extra=None):
 def _log_record_factory(log_factory=None, extra=None):
     if log_factory is None:
         log_factory = logging.getLogRecordFactory()
+
     def _factory(*args, **kwargs):
         record = log_factory(*args, **kwargs)
         try:
             record.taskName = asyncio.current_task().get_name()
         except Exception:
             record.taskName = None
+        if not hasattr(record, "exchange"):
+            record.exchange = None
+        if not hasattr(record, "duration"):
+            record.duration = None
         if extra is not None:
             for key, value in extra.items():
                 setattr(record, key, value)
@@ -46,9 +51,7 @@ def _log_record_factory(log_factory=None, extra=None):
 
 
 def get_logger(name=None, extra=None):
-    logging.setLogRecordFactory(
-        _log_record_factory(extra=extra)
-    )
+    logging.setLogRecordFactory(_log_record_factory(extra=extra))
     logger = logging.getLogger(name)
     try:
         level = getattr(logging, os.getenv("LOG_LEVEL", "INFO"))
@@ -56,8 +59,6 @@ def get_logger(name=None, extra=None):
         level = logging.INFO
     logger.setLevel(level)
     handler = _get_log_handler(extra)
-    if extra is None:
-        extra = {}
     logger.addHandler(handler)
     return logger
 
