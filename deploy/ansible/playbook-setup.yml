@@ -154,7 +154,7 @@
           LOG_LEVEL=DEBUG
           LOG_HANDLER=CLOUD_WATCH
           LOG_GROUP_NAME=anxiousbot-updater-logs
-          LOG_STREAM_NAME={{ ansible_ec2_metadata.instance_id }}-logs
+          LOG_STREAM_NAME={{ ansible_ec2_instance_id }}-logs
           BOT_TOKEN={{ bot_token }}
           BOT_CHAT_ID={{ bot_chat_id }}
           BINANCE_API_KEY={{ binance_api_key }}
@@ -335,7 +335,7 @@
           LOG_LEVEL=DEBUG
           LOG_HANDLER=CLOUD_WATCH
           LOG_GROUP_NAME=anxiousbot-dealer-logs
-          LOG_STREAM_NAME={{ ansible_ec2_metadata.instance_id }}-logs
+          LOG_STREAM_NAME={{ ansible_ec2_instance_id }}-logs
           BOT_TOKEN={{ bot_token }}
           BOT_CHAT_ID={{ bot_chat_id }}
           BINANCE_API_KEY={{ binance_api_key }}
