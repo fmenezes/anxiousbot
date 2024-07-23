@@ -27,7 +27,9 @@ def _get_log_handler(extra=None):
     return handler
 
 
-def _log_record_factory(log_factory, extra):
+def _log_record_factory(log_factory=None, extra=None):
+    if log_factory is None:
+        log_factory = logging.getLogRecordFactory()
     def _factory(*args, **kwargs):
         record = log_factory(*args, **kwargs)
         record.taskName = getattr(record, "taskName", None)
@@ -40,10 +42,10 @@ def _log_record_factory(log_factory, extra):
 
 
 def get_logger(name=None, extra=None):
-    logger = logging.getLogger(name)
     logging.setLogRecordFactory(
-        _log_record_factory(logging.getLogRecordFactory(), extra)
+        _log_record_factory(extra=extra)
     )
+    logger = logging.getLogger(name)
     try:
         level = getattr(logging, os.getenv("LOG_LEVEL", "INFO"))
     except:
