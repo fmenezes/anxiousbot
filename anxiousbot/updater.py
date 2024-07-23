@@ -55,7 +55,7 @@ class Updater(App):
                                 order_book["bids"],
                                 expire=self.expire_book_orders,
                             )
-                        duration = datetime.now() - start
+                        duration = str(datetime.now() - start)
                         self.logger.debug(
                             f"Updated {setting['exchange']} in {duration}",
                             extra={
