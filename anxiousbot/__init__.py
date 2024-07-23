@@ -14,6 +14,7 @@ def _get_log_handler(extra=None):
     if os.getenv("LOG_HANDLER", "STDOUT") == "CLOUD_WATCH":
         handler = CloudWatchLogHandler(
             boto3_client=boto3.client("logs", region_name=os.getenv("AWS_REGION")),
+            send_interval=5,
             log_group=os.getenv("LOG_GROUP_NAME"),
             stream_name=os.getenv("LOG_STREAM_NAME"),
         )
@@ -32,7 +33,10 @@ def _log_record_factory(log_factory=None, extra=None):
         log_factory = logging.getLogRecordFactory()
     def _factory(*args, **kwargs):
         record = log_factory(*args, **kwargs)
-        record.taskName = getattr(record, "taskName", None)
+        try:
+            record.taskName = asyncio.current_task().get_name()
+        except Exception:
+            record.taskName = None
         if extra is not None:
             for key, value in extra.items():
                 setattr(record, key, value)
