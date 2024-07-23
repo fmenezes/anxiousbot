@@ -2,20 +2,22 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from watchtower import CloudWatchLogHandler
 
+import boto3
 import ccxt.pro as ccxt
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
+from watchtower import CloudWatchLogHandler
 
 
 def _get_log_handler(extra=None):
-    if os.getenv('LOG_HANDLER', 'STDOUT') == 'CLOUD_WATCH':
+    if os.getenv("LOG_HANDLER", "STDOUT") == "CLOUD_WATCH":
         handler = CloudWatchLogHandler(
-            log_group=os.getenv('LOG_GROUP_NAME'), 
-            stream_name=os.getenv('LOG_STREAM_NAME')
+            boto3_client=boto3.client("logs", region=os.getenv("AWS_REGION")),
+            log_group=os.getenv("LOG_GROUP_NAME"),
+            stream_name=os.getenv("LOG_STREAM_NAME"),
         )
-        attrs = ['name', 'levelname', 'taskName']
+        attrs = ["name", "levelname", "taskName"]
         if extra is not None:
             attrs += extra.keys()
         handler.formatter.add_log_record_attrs = attrs
@@ -24,20 +26,25 @@ def _get_log_handler(extra=None):
 
     return handler
 
+
 def _log_record_factory(log_factory, extra):
     def _factory(*args, **kwargs):
         record = log_factory(*args, **kwargs)
         for key, value in extra.items():
             setattr(record, key, value)
         return record
+
     return _factory
+
 
 def get_logger(name=None, extra=None):
     logger = logging.getLogger(name)
     if extra is not None:
-        logging.setLogRecordFactory(_log_record_factory(logging.getLogRecordFactory(), extra))
+        logging.setLogRecordFactory(
+            _log_record_factory(logging.getLogRecordFactory(), extra)
+        )
     try:
-        level = getattr(logging, os.getenv('LOG_LEVEL', 'INFO')) 
+        level = getattr(logging, os.getenv("LOG_LEVEL", "INFO"))
     except:
         level = logging.INFO
     logger.setLevel(level)
