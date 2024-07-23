@@ -14,6 +14,9 @@
     - vars/secrets.yml
 
   tasks:
+    - name: Gather EC2 instance metadata
+      ec2_metadata_facts:
+
     - name: Update all packages on Amazon Linux
       yum:
         name: '*'
@@ -28,7 +31,6 @@
           - amazon-cloudwatch-agent
           - cronie
           - awscli
-          - logrotate
           - memcached
         state: latest
 
@@ -95,36 +97,6 @@
               }
             },
             "logs": {
-              "logs_collected": {
-                "files": {
-                  "collect_list": [
-                    {
-                      "file_path": "/var/log/anxiousbot/stdout.log",
-                      "log_group_name": "anxiousbot-updater-logs",
-                      "log_stream_name": "{instance_id}-stdout-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/stdout.log.*",
-                      "log_group_name": "anxiousbot-updater-logs",
-                      "log_stream_name": "{instance_id}-stdout-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/stderr.log",
-                      "log_group_name": "anxiousbot-updater-logs",
-                      "log_stream_name": "{instance_id}-stderr-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/stderr.log.*",
-                      "log_group_name": "anxiousbot-updater-logs",
-                      "log_stream_name": "{instance_id}-stderr-logs",
-                      "timezone": "UTC"
-                    }
-                  ]
-                }
-              },
               "log_stream_name": "anxiousbot_log_stream"
             }
           }
@@ -156,8 +128,6 @@
           ExecStart=/usr/local/bin/poetry run main updater
           Restart=always
           RestartSec=5s
-          StandardOutput=append:/var/log/anxiousbot/stdout.log
-          StandardError=append:/var/log/anxiousbot/stderr.log
 
           [Install]
           WantedBy=multi-user.target
@@ -181,6 +151,10 @@
       blockinfile:
         path: /opt/anxiousbot/.env
         block: |
+          LOG_LEVEL=DEBUG
+          LOG_HANDLER=CLOUD_WATCH
+          LOG_GROUP_NAME=anxiousbot-updater-logs
+          LOG_STREAM_NAME={{ ansible_ec2_metadata.instance_id }}-logs
           BOT_TOKEN={{ bot_token }}
           BOT_CHAT_ID={{ bot_chat_id }}
           BINANCE_API_KEY={{ binance_api_key }}
@@ -207,37 +181,6 @@
         enabled: yes
         state: started
 
-    - name: Create script to delete old log files
-      copy:
-        dest: /etc/anxiousbot/delete_old_logs.sh
-        content: |
-          #!/bin/bash
-          find /var/log/anxiousbot/ -type f -name "*.log.*" -mtime +1 -exec rm -f {} \;
-        owner: root
-        group: root
-        mode: 0755
-
-    - name: Create logrotate configuration for Anxiousbot logs
-      copy:
-        dest: /etc/logrotate.d/anxiousbot
-        content: |
-          /var/log/anxiousbot/*.log {
-            daily
-            rotate 1
-            compress
-            missingok
-            notifempty
-            create 0644 root root
-            sharedscripts
-            postrotate
-              systemctl reload anxiousbot > /dev/null 2>/dev/null || true
-              /etc/anxiousbot/delete_old_logs.sh
-            endscript
-          }
-        owner: root
-        group: root
-        mode: 0644
-
     - name: Enable and start Anxiousbot Service
       systemd:
         name: anxiousbot
@@ -252,6 +195,9 @@
     - vars/secrets.yml
 
   tasks:
+    - name: Gather EC2 instance metadata
+      ec2_metadata_facts:
+
     - name: Update all packages on Amazon Linux
       yum:
         name: '*'
@@ -266,7 +212,6 @@
           - amazon-cloudwatch-agent
           - cronie
           - awscli
-          - logrotate
           - memcached
         state: latest
 
@@ -333,48 +278,6 @@
               }
             },
             "logs": {
-              "logs_collected": {
-                "files": {
-                  "collect_list": [
-                    {
-                      "file_path": "/var/log/anxiousbot/stdout.log",
-                      "log_group_name": "anxiousbot-dealer-logs",
-                      "log_stream_name": "{instance_id}-stdout-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/stdout.log.*",
-                      "log_group_name": "anxiousbot-dealer-logs",
-                      "log_stream_name": "{instance_id}-stdout-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/stderr.log",
-                      "log_group_name": "anxiousbot-dealer-logs",
-                      "log_stream_name": "{instance_id}-stderr-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/stderr.log.*",
-                      "log_group_name": "anxiousbot-dealer-logs",
-                      "log_stream_name": "{instance_id}-stderr-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/s3sync.log",
-                      "log_group_name": "anxiousbot-dealer-logs",
-                      "log_stream_name": "{instance_id}-s3sync-logs",
-                      "timezone": "UTC"
-                    },
-                    {
-                      "file_path": "/var/log/anxiousbot/s3sync.log.*",
-                      "log_group_name": "anxiousbot-dealer-logs",
-                      "log_stream_name": "{instance_id}-s3sync-logs",
-                      "timezone": "UTC"
-                    }
-                  ]
-                }
-              },
               "log_stream_name": "anxiousbot_log_stream"
             }
           }
@@ -406,8 +309,6 @@
           ExecStart=/usr/local/bin/poetry run main dealer
           Restart=always
           RestartSec=5s
-          StandardOutput=append:/var/log/anxiousbot/stdout.log
-          StandardError=append:/var/log/anxiousbot/stderr.log
 
           [Install]
           WantedBy=multi-user.target
@@ -431,6 +332,10 @@
       blockinfile:
         path: /opt/anxiousbot/.env
         block: |
+          LOG_LEVEL=DEBUG
+          LOG_HANDLER=CLOUD_WATCH
+          LOG_GROUP_NAME=anxiousbot-dealer-logs
+          LOG_STREAM_NAME={{ ansible_ec2_metadata.instance_id }}-logs
           BOT_TOKEN={{ bot_token }}
           BOT_CHAT_ID={{ bot_chat_id }}
           BINANCE_API_KEY={{ binance_api_key }}
@@ -471,37 +376,6 @@
         name: "Run script every hour"
         minute: "0"
         job: "/etc/anxiousbot/s3sync.sh >> /var/log/anxiousbot/s3sync.log 2>&1"
-
-    - name: Create script to delete old log files
-      copy:
-        dest: /etc/anxiousbot/delete_old_logs.sh
-        content: |
-          #!/bin/bash
-          find /var/log/anxiousbot/ -type f -name "*.log.*" -mtime +1 -exec rm -f {} \;
-        owner: root
-        group: root
-        mode: 0755
-
-    - name: Create logrotate configuration for Anxiousbot logs
-      copy:
-        dest: /etc/logrotate.d/anxiousbot
-        content: |
-          /var/log/anxiousbot/*.log {
-            daily
-            rotate 1
-            compress
-            missingok
-            notifempty
-            create 0644 root root
-            sharedscripts
-            postrotate
-              systemctl reload anxiousbot > /dev/null 2>/dev/null || true
-              /etc/anxiousbot/delete_old_logs.sh
-            endscript
-          }
-        owner: root
-        group: root
-        mode: 0644
 
     - name: Enable and start Anxiousbot Service
       systemd:

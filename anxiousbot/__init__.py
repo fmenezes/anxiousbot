@@ -2,36 +2,48 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from watchtower import CloudWatchLogHandler
 
 import ccxt.pro as ccxt
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
-from pythonjsonlogger import jsonlogger
 
 
-class CustomJsonFormatter(jsonlogger.JsonFormatter):
-    def __init__(self, extra=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._extra = extra
+def _get_log_handler(extra=None):
+    if os.getenv('LOG_HANDLER', 'STDOUT') == 'CLOUD_WATCH':
+        handler = CloudWatchLogHandler(
+            log_group=os.getenv('LOG_GROUP_NAME'), 
+            stream_name=os.getenv('LOG_STREAM_NAME')
+        )
+        attrs = ['name', 'levelname', 'taskName']
+        if extra is not None:
+            attrs += extra.keys()
+        handler.formatter.add_log_record_attrs = attrs
+    else:
+        handler = logging.StreamHandler()
 
-    def add_fields(self, log_record, record, message_dict):
-        super().add_fields(log_record, record, message_dict)
-        log_record["levelname"] = record.levelname
-        if self._extra is not None:
-            for key, value in self._extra.items():
-                log_record[key] = value
+    return handler
 
+def _log_record_factory(log_factory, extra):
+    def _factory(*args, **kwargs):
+        record = log_factory(*args, **kwargs)
+        for key, value in extra.items():
+            setattr(record, key, value)
+        return record
+    return _factory
 
 def get_logger(name=None, extra=None):
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
+    if extra is not None:
+        logging.setLogRecordFactory(_log_record_factory(logging.getLogRecordFactory(), extra))
+    try:
+        level = getattr(logging, os.getenv('LOG_LEVEL', 'INFO')) 
+    except:
+        level = logging.INFO
+    logger.setLevel(level)
+    handler = _get_log_handler(extra)
     if extra is None:
         extra = {}
-    formatter = CustomJsonFormatter(
-        timestamp=True, extra={"pid": os.getpid(), "app": name, **extra}
-    )
-    handler.setFormatter(formatter)
     logger.addHandler(handler)
     return logger
 
