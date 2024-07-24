@@ -20,7 +20,7 @@ class Notifier(App):
                         while True:
                             try:
                                 event = await bot_queue.get()
-                                if event["type"] != "close":
+                                if event["type"] in ["open", "close"]:
                                     continue
                                 await bot.send_message(
                                     chat_id=self.bot_chat_id, text=event["message"]
