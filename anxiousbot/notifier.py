@@ -20,7 +20,7 @@ class Notifier(App):
                         while True:
                             try:
                                 event = await bot_queue.get()
-                                if event["type"] in ["open", "close"]:
+                                if event["type"] not in ["open", "close"]:
                                     continue
                                 icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
                                 msg = f"{icon} {event["message"]}"
