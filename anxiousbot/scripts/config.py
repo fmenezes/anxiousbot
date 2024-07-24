@@ -60,6 +60,7 @@ async def _process_exchange(client):
     data = {
         "exchange": client.id,
         "mode": "none",
+        "method": "fetch_order_book",
         "symbols": [],
         "limit": _limit(client.id),
     }
@@ -84,8 +85,15 @@ async def _process_exchange(client):
     ]
     for m in all_methods + batch_methods + single_methods:
         if desc["has"].get(m, False):
-            data["method"] = m
-            break
+            try:
+                param = data["symbols"]
+                if m in single_methods:
+                    param = param[0]
+                await getattr(client, m)(param)
+                data["method"] = m
+                break
+            except:
+                continue
     if data["method"] in all_methods:
         data["mode"] = "all"
     if data["method"] in batch_methods:
@@ -226,7 +234,9 @@ async def _run():
     symbols_exchanges = dict(
         [(entry["symbol"], entry["exchanges"]) for entry in filtered_symbol_list]
     )
-    config = [{"dealer": {"symbols": symbols_exchanges}}] + [{"updater": entry} for entry in data]
+    config = [{"dealer": {"symbols": symbols_exchanges}}] + [
+        {"updater": entry} for entry in data
+    ]
     index = 0
     for entry in config:
         with open(f"./config/config-{index}.json", "w") as f:

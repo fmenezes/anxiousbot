@@ -4,14 +4,13 @@ import json
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 
-
-from anxiousbot import get_logger, closing
+from anxiousbot import closing, get_logger
 from anxiousbot.dealer import Dealer
 from anxiousbot.notifier import Notifier
 from anxiousbot.updater import Updater
 
 
-class Runner():
+class Runner:
     def __init__(self, config_path, cache_endpoint, bot_token, bot_chat_id):
         self.config_path = config_path
         self.cache_endpoint = cache_endpoint
@@ -19,8 +18,9 @@ class Runner():
         self.bot_chat_id = bot_chat_id
         self.bot_queue = asyncio.Queue()
         self.logger = get_logger(name="runner", extra={"config": self.config_path})
-        self.memcache_client = MemcacheClient(self.cache_endpoint, serde=serde.pickle_serde)
-
+        self.memcache_client = MemcacheClient(
+            self.cache_endpoint, serde=serde.pickle_serde
+        )
 
     async def dealer_run(self, config):
         logger = get_logger(name="dealer", extra={"config": self.config_path})
@@ -39,7 +39,7 @@ class Runner():
                 memcache_client=self.memcache_client,
                 logger=logger,
                 bot_token=self.bot_token,
-                bot_chat_id=self.bot_chat_id
+                bot_chat_id=self.bot_chat_id,
             )
         ) as service:
             return await service.run(self.bot_queue)
@@ -61,10 +61,9 @@ class Runner():
         self.memcache_client.set("/balance/USDT", 100000)
 
         tasks = []
-        if config['dealer'] is not None:
+        if config["dealer"] is not None:
             tasks += [self.dealer_run(config), self.notifier_run(config)]
-        if config['updater'] is not None:
+        if config["updater"] is not None:
             tasks += [self.updater_run(config)]
 
         return await asyncio.gather(*tasks)
-

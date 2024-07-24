@@ -36,7 +36,5 @@ class Notifier(App):
                     await asyncio.sleep(1)
         except Exception as e:
             self.logger.info(f"Notifier exited with error")
-            self.logger.exception(
-                f"An error occurred: [{type(e).__name__}] {str(e)}"
-            )
+            self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
             return 1

@@ -77,7 +77,7 @@ class Updater(App):
 
             tasks = []
             i = 0
-            for setting in config['updater']:
+            for setting in config["updater"]:
                 tasks += [
                     asyncio.create_task(
                         self._watch_order_book(setting), name=f"setting-{i}"
@@ -93,4 +93,3 @@ class Updater(App):
             self.logger.info(f"Updater exited with error")
             self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
             return 1
-

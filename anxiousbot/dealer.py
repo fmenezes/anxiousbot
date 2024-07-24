@@ -336,10 +336,10 @@ class Dealer(App):
     async def run(self, config, bot_queue):
         self.logger.info(f"Dealer started")
         try:
-            await self._init_exchanges(config['dealer'])
+            await self._init_exchanges(config["dealer"])
 
             tasks = []
-            for symbol, exchanges in config['dealer']["symbols"].items():
+            for symbol, exchanges in config["dealer"]["symbols"].items():
                 tasks += [self._watch_deals(symbol, exchanges, bot_queue)]
 
             await asyncio.gather(*tasks)
@@ -349,4 +349,3 @@ class Dealer(App):
             self.logger.info(f"Dealer exited with error")
             self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
             return 1
-
