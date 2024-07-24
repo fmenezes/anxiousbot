@@ -61,9 +61,9 @@ class Runner:
         self.memcache_client.set("/balance/USDT", 100000)
 
         tasks = []
-        if config["dealer"] is not None:
+        if config.get("dealer") is not None:
             tasks += [self.dealer_run(config), self.notifier_run(config)]
-        if config["updater"] is not None:
+        if config.get("updater") is not None:
             tasks += [self.updater_run(config)]
 
         return await asyncio.gather(*tasks)
