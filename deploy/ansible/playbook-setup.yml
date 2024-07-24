@@ -6,190 +6,8 @@
     - name: Wait for ssh access
       wait_for_connection:
 
-
-- name: Configure updater instances
-  hosts: tag_Role_updater
-  become: yes
-  vars_files:
-    - vars/secrets.yml
-
-  tasks:
-    - name: Gather EC2 instance metadata
-      ec2_metadata_facts:
-
-    - name: Update all packages on Amazon Linux
-      yum:
-        name: '*'
-        state: latest
-
-    - name: Install required system packages
-      yum:
-        name:
-          - git
-          - python3.11
-          - python3.11-pip
-          - amazon-cloudwatch-agent
-          - awscli
-          - memcached
-        state: latest
-
-    - name: Install Poetry
-      pip:
-        name: poetry
-        executable: pip3.11
-        extra_args: --ignore-installed
-
-    - name: Create CloudWatch Agent configuration directory
-      file:
-        path: /opt/aws/amazon-cloudwatch-agent/etc
-        state: directory
-        mode: '0755'
-
-    - name: Create logs directory
-      file:
-        path: /var/log/anxiousbot
-        state: directory
-        mode: '0755'
-
-    - name: Create CloudWatch Agent configuration file
-      copy:
-        dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
-        content: |
-          {
-            "agent": {
-              "metrics_collection_interval": 60,
-              "run_as_user": "root"
-            },
-            "metrics": {
-              "append_dimensions": {
-                "InstanceId": "${aws:InstanceId}"
-              },
-              "metrics_collected": {
-                "cpu": {
-                  "measurement": [
-                    "cpu_usage_idle",
-                    "cpu_usage_iowait",
-                    "cpu_usage_user",
-                    "cpu_usage_system"
-                  ],
-                  "metrics_collection_interval": 60,
-                  "resources": [
-                    "*"
-                  ]
-                },
-                "mem": {
-                  "measurement": [
-                    "mem_used_percent"
-                  ],
-                  "metrics_collection_interval": 60
-                },
-                "net": {
-                  "measurement": [
-                    "bytes_sent",
-                    "bytes_recv"
-                  ],
-                  "metrics_collection_interval": 60,
-                  "resources": [
-                    "*"
-                  ]
-                }
-              }
-            },
-            "logs": {
-              "log_stream_name": "anxiousbot_log_stream"
-            }
-          }
-
-    - name: Clone the GitHub repository
-      git:
-        repo: 'https://{{ github_token }}@github.com/fmenezes/anxiousbot.git'
-        dest: /opt/anxiousbot
-
-    - name: Install dependencies with Poetry
-      shell: |
-        cd /opt/anxiousbot
-        poetry install
-      args:
-        executable: /bin/bash
-
-    - name: Copy systemd service file
-      copy:
-        dest: /etc/systemd/system/anxiousbot.service
-        content: |
-          [Unit]
-          Description=Anxiousbot Service
-          After=network.target
-
-          [Service]
-          User=root
-          Group=root
-          WorkingDirectory=/opt/anxiousbot
-          ExecStart=/usr/local/bin/poetry run main updater
-          Restart=always
-          RestartSec=5s
-
-          [Install]
-          WantedBy=multi-user.target
-        owner: root
-        group: root
-        mode: 0644
-
-    - name: reload systemd
-      systemd:
-        daemon_reload: yes
-
-    - name: Symlink .env file
-      ansible.builtin.file:
-        src: /etc/anxiousbot/.env
-        dest: /opt/anxiousbot/.env
-        owner: root
-        group: root
-        state: link
-
-    - name: add secrets to .env
-      blockinfile:
-        path: /opt/anxiousbot/.env
-        block: |
-          AWS_REGION={{ ansible_ec2_placement_region }}
-          LOG_LEVEL=DEBUG
-          LOG_HANDLER=CLOUD_WATCH
-          LOG_GROUP_NAME=anxiousbot-updater-logs
-          LOG_STREAM_NAME={{ ansible_ec2_instance_id }}-logs
-          BOT_TOKEN={{ bot_token }}
-          BOT_CHAT_ID={{ bot_chat_id }}
-          BINANCE_API_KEY={{ binance_api_key }}
-          BINANCE_SECRET={{ binance_secret }}
-          KUCOIN_API_KEY={{ kucoin_api_key }}
-          KUCOIN_SECRET={{ kucoin_secret }}
-          KUCOIN_PASSPHRASE={{ kucoin_passphrase }}
-          BITGET_API_KEY={{ bitget_api_key }}
-          BITGET_SECRET={{ bitget_secret }}
-          BITMART_API_KEY={{ bitmart_api_key }}
-          BITMART_SECRET={{ bitmart_secret }}
-          COINBASE_API_KEY={{ coinbase_api_key }}
-          COINBASE_SECRET={{ coinbase_secret }}
-          GATE_API_KEY={{ gate_api_key }}
-          GATE_SECRET={{ gate_secret }}
-          BINGX_API_KEY={{ bingx_api_key }}
-          BINGX_SECRET={{ bingx_secret }}
-        create: yes
-        marker: ""
-
-    - name: Enable and start CloudWatch Agent service
-      systemd:
-        name: amazon-cloudwatch-agent
-        enabled: yes
-        state: started
-
-    - name: Enable and start Anxiousbot Service
-      systemd:
-        name: anxiousbot
-        state: started
-        enabled: yes
-
-
-- name: Configure dealer instances
-  hosts: tag_Role_dealer
+- name: Configure instances
+  hosts: tag_Project_anxiousbot
   become: yes
   vars_files:
     - vars/secrets.yml
@@ -227,12 +45,6 @@
         state: directory
         mode: '0755'
 
-    - name: Create logs directory
-      file:
-        path: /var/log/anxiousbot
-        state: directory
-        mode: '0755'
-
     - name: Create CloudWatch Agent configuration file
       copy:
         dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
@@ -306,7 +118,7 @@
           User=root
           Group=root
           WorkingDirectory=/opt/anxiousbot
-          ExecStart=/usr/local/bin/poetry run main dealer
+          ExecStart=/usr/local/bin/poetry run main
           Restart=always
           RestartSec=5s
 
@@ -335,7 +147,7 @@
           AWS_REGION={{ ansible_ec2_placement_region }}
           LOG_LEVEL=DEBUG
           LOG_HANDLER=CLOUD_WATCH
-          LOG_GROUP_NAME=anxiousbot-dealer-logs
+          LOG_GROUP_NAME=anxiousbot-logs
           LOG_STREAM_NAME={{ ansible_ec2_instance_id }}-logs
           BOT_TOKEN={{ bot_token }}
           BOT_CHAT_ID={{ bot_chat_id }}

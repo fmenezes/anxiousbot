@@ -12,10 +12,6 @@ terraform {
   }
 }
 
-locals {
-  config = jsondecode(file("../../config/config.json"))
-}
-
 # S3 Bucket
 data "aws_s3_bucket" "main" {
   bucket = "anxiousbot-main-bucket"
@@ -233,34 +229,13 @@ resource "aws_elasticache_cluster" "cache_cluster" {
   }
 }
 
-# EC2 Instance
-resource "aws_instance" "updater" {
-  count                       = length(local.config.updater)
-  ami                         = "ami-01b799c439fd5516a"
-  instance_type               = "t2.small"
-  subnet_id                   = aws_subnet.main.id
-  vpc_security_group_ids      = [aws_security_group.allow_ssh.id]
-  associate_public_ip_address = true
-  key_name                    = "filipe"
-  iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
-
-  user_data = <<-EOF
-    #!/bin/bash
-    mkdir -p /etc/anxiousbot
-    echo 'S3BUCKET="${data.aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
-    echo 'UPDATER_INDEX="${count.index}"' >> /etc/anxiousbot/.env
-    echo 'CACHE_ENDPOINT="${aws_elasticache_cluster.cache_cluster.configuration_endpoint}"' >> /etc/anxiousbot/.env
-  EOF
-
-  tags = {
-    Name    = "anxiousbot-updater-${count.index}"
-    Role    = "updater"
-    Project = "anxiousbot"
-  }
+data "external" "count_config_files" {
+  program = ["bash", "count_config_files.sh"]
 }
 
 # EC2 Instance
-resource "aws_instance" "dealer" {
+resource "aws_instance" "server" {
+  count                       = data.external.count_config_files.result.files
   ami                         = "ami-01b799c439fd5516a"
   instance_type               = "t2.medium"
   subnet_id                   = aws_subnet.main.id
@@ -273,32 +248,22 @@ resource "aws_instance" "dealer" {
     #!/bin/bash
     mkdir -p /etc/anxiousbot
     echo 'S3BUCKET="${data.aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
+    echo 'CONFIG_PATH="config/config-${count.index}.json"' >> /etc/anxiousbot/.env
     echo 'CACHE_ENDPOINT="${aws_elasticache_cluster.cache_cluster.configuration_endpoint}"' >> /etc/anxiousbot/.env
   EOF
 
   tags = {
-    Name    = "anxiousbot-dealer"
-    Role    = "dealer"
+    Name    = "anxiousbot-${count.index}"
     Project = "anxiousbot"
   }
 }
 
-output "updater_instance_ids" {
+output "instance_ids" {
   description = "List of instance IDs"
-  value       = [for instance in aws_instance.updater : instance.id]
+  value       = [for instance in aws_instance.server : instance.id]
 }
 
-output "updater_public_ips" {
+output "public_ips" {
   description = "List of public IP addresses"
-  value       = [for instance in aws_instance.updater : instance.public_ip]
-}
-
-output "dealer_instance_id" {
-  description = "Instance ID"
-  value       = aws_instance.dealer.id
-}
-
-output "dealer_public_ip" {
-  description = "Public IP address"
-  value       = aws_instance.dealer.public_ip
+  value       = [for instance in aws_instance.server : instance.public_ip]
 }

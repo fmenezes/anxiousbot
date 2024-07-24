@@ -334,43 +334,19 @@ class Dealer(App):
             self.exchanges[exchange_id] = await self.setup_exchange(exchange_id)
 
     async def run(self, config, bot_queue):
-        await self._init_exchanges(config)
-
-        tasks = []
-        for symbol, exchanges in config["symbols"].items():
-            tasks += [self._watch_deals(symbol, exchanges, bot_queue)]
-
-        await asyncio.gather(*tasks)
-
-
-async def run(bot_queue):
-    CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/config.json")
-    CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT", "localhost")
-
-    with open(CONFIG_PATH, "r") as f:
-        config = json.load(f)
-
-    logger = get_logger(name="dealer")
-
-    def handle_exception(exc_type, exc_value, exc_traceback):
-        logger.exception(traceback.format_exception(exc_type, exc_value, exc_traceback))
-
-    sys.excepthook = handle_exception
-
-    memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
-    memcache_client.set("/balance/USDT", 100000)
-    async with closing(
-        Dealer(
-            memcache_client=memcache_client,
-            logger=logger,
-        )
-    ) as dealer:
+        self.logger.info(f"Dealer started")
         try:
-            logger.info(f"Dealer started")
-            await dealer.run(config["dealer"], bot_queue)
-            logger.info(f"Dealer exited")
+            await self._init_exchanges(config['dealer'])
+
+            tasks = []
+            for symbol, exchanges in config['dealer']["symbols"].items():
+                tasks += [self._watch_deals(symbol, exchanges, bot_queue)]
+
+            await asyncio.gather(*tasks)
+            self.logger.info(f"Dealer exited")
             return 0
         except Exception as e:
-            logger.info(f"Dealer exited with error")
-            logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
+            self.logger.info(f"Dealer exited with error")
+            self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
             return 1
+

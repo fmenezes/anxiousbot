@@ -1,37 +1,18 @@
-import argparse
+import os
 import asyncio
 
 from dotenv import load_dotenv
 
-from anxiousbot.dealer import run as dealer_run
-from anxiousbot.notifier import run as notifier_run
-from anxiousbot.updater import run as updater_run
-
+from anxiousbot.runner import Runner
 
 def _main():
     load_dotenv(override=True)
-
-    parser = argparse.ArgumentParser(prog="anxiousbot")
-    subparsers = parser.add_subparsers(dest="command")
-    dealer_parser = subparsers.add_parser("dealer", help="Run the dealer")
-    updater_parser = subparsers.add_parser("updater", help="Run the updater")
-    args = parser.parse_args()
-    if args.command == "dealer":
-        return asyncio.run(dealer_notifier_run())
-    elif args.command == "updater":
-        return asyncio.run(updater_run())
-    parser.print_help()
-    return 1
-
-
-async def dealer_notifier_run():
-    bot_queue = asyncio.Queue()
-
-    tasks = []
-    tasks += [dealer_run(bot_queue), notifier_run(bot_queue)]
-
-    return await asyncio.gather(*tasks)
-
+    CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/local.json")
+    CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT", "localhost")
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    BOT_CHAT_ID = os.getenv("BOT_CHAT_ID")
+    r = Runner(config_path=CONFIG_PATH, cache_endpoint=CACHE_ENDPOINT, bot_token=BOT_TOKEN, bot_chat_id=BOT_CHAT_ID)
+    return asyncio.run(r.run())
 
 if __name__ == "__main__":
     exit(_main())

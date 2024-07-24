@@ -71,11 +71,13 @@ class Updater(App):
             )
             await asyncio.sleep(1)
 
-    async def run(self, settings):
+    async def run(self, config):
         try:
+            self.logger.info(f"Updater started")
+
             tasks = []
             i = 0
-            for setting in settings:
+            for setting in config['updater']:
                 tasks += [
                     asyncio.create_task(
                         self._watch_order_book(setting), name=f"setting-{i}"
@@ -84,33 +86,11 @@ class Updater(App):
                 i += 1
 
             await asyncio.gather(*tasks)
-        except Exception as e:
-            raise e
 
-
-async def run():
-    CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/config.json")
-    UPDATER_INDEX = os.getenv("UPDATER_INDEX", "0")
-    CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT", "localhost")
-
-    with open(CONFIG_PATH, "r") as f:
-        config = json.load(f)
-    logger = get_logger(name="updater", extra={"config": UPDATER_INDEX})
-
-    def handle_exception(exc_type, exc_value, exc_traceback):
-        logger.exception(traceback.format_exception(exc_type, exc_value, exc_traceback))
-
-    sys.excepthook = handle_exception
-    memcache_client = MemcacheClient(CACHE_ENDPOINT, serde=serde.pickle_serde)
-    async with closing(
-        Updater(logger=logger, memcache_client=memcache_client)
-    ) as updater:
-        try:
-            logger.info(f"Updater started")
-            await updater.run(config["updater"][int(UPDATER_INDEX)])
-            logger.info(f"Updater exited successfully")
+            self.logger.info(f"Updater exited successfully")
             return 0
         except Exception as e:
-            logger.info(f"Updater exited with error")
-            logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
+            self.logger.info(f"Updater exited with error")
+            self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
             return 1
+

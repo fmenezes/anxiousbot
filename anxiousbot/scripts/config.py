@@ -226,9 +226,12 @@ async def _run():
     symbols_exchanges = dict(
         [(entry["symbol"], entry["exchanges"]) for entry in filtered_symbol_list]
     )
-    config = {"dealer": {"symbols": symbols_exchanges}, "updater": data}
-    with open("./config/config.json", "w") as f:
-        json.dump(config, fp=f, indent=2)
+    config = [{"dealer": {"symbols": symbols_exchanges}}] + [{"updater": entry} for entry in data]
+    index = 0
+    for entry in config:
+        with open(f"./config/config-{index}.json", "w") as f:
+            json.dump(entry, fp=f, indent=2)
+        index += 1
 
 
 def _main():
