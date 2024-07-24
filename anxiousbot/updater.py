@@ -61,6 +61,7 @@ class Updater(App):
                             extra={
                                 "exchange": setting["exchange"],
                                 "duration": duration,
+                                "symbol": setting["symbols"][0] if setting["mode"] == "single" else None,
                             },
                         )
             except Exception as e:
