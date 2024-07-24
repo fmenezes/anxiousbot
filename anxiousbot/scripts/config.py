@@ -216,7 +216,23 @@ def _split_machines(data, count=None):
 
 
 async def _run():
-    clients = [getattr(ccxt, exchange)() for exchange in ccxt.exchanges]
+    exchanges = [
+        exchange
+        for exchange in ccxt.exchanges
+        if exchange
+        not in [
+            "bitfinex",
+            "kucoinfutures",
+            "poloniexfutures",
+            "krakenfutures",
+            "binancecoinm",
+            "binanceus",
+            "binanceusdm",
+            "coinbaseinternational",
+            "coinbaseexchange",
+        ]
+    ]
+    clients = [getattr(ccxt, exchange)() for exchange in exchanges]
     clients = [
         client for client in clients if not client.describe().get("alias", False)
     ]

@@ -82,7 +82,24 @@ async def _process_exchange(exchange, symbols):
 async def _run():
     symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "GALA/USDT"]
 
-    tasks = [_process_exchange(exchange, symbols) for exchange in ccxt.exchanges]
+    exchanges = [
+        exchange
+        for exchange in ccxt.exchanges
+        if exchange
+        not in [
+            "bitfinex",
+            "kucoinfutures",
+            "poloniexfutures",
+            "krakenfutures",
+            "binancecoinm",
+            "binanceus",
+            "binanceusdm",
+            "coinbaseinternational",
+            "coinbaseexchange",
+        ]
+    ]
+
+    tasks = [_process_exchange(exchange, symbols) for exchange in exchanges]
     results = await asyncio.gather(*tasks)
     results = [entry for entry in results if entry is not None]
 
