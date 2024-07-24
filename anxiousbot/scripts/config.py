@@ -56,7 +56,12 @@ def _limit(exchange):
     return None
 
 
-async def _process_exchange(client):
+async def _process_exchange(exchange):
+    client = getattr(ccxt, exchange)()
+    desc = client.describe()
+    if desc.get("alias", False) == True:
+        return None
+
     data = {
         "exchange": client.id,
         "mode": "none",
@@ -64,47 +69,51 @@ async def _process_exchange(client):
         "symbols": [],
         "limit": _limit(client.id),
     }
-    desc = client.describe()
-    all_methods = [
-        "fetchOrderBooks",
-        "fetch_order_books",
-        "watchOrderBooks",
-        "watch_order_books",
-    ]
-    batch_methods = [
-        "fetchOrderBookForSymbols",
-        "fetch_order_book_for_symbols",
-        "watchOrderBookForSymbols",
-        "watch_order_book_for_symbols",
-    ]
-    single_methods = [
-        "fetchOrderBook",
-        "fetch_order_book",
-        "watchOrderBook",
-        "watch_order_book",
-    ]
-    for m in all_methods + batch_methods + single_methods:
-        if desc["has"].get(m, False):
-            try:
-                param = data["symbols"]
-                if m in single_methods:
-                    param = param[0]
-                await getattr(client, m)(param)
-                data["method"] = m
-                break
-            except:
-                continue
-    if data["method"] in all_methods:
-        data["mode"] = "all"
-    if data["method"] in batch_methods:
-        data["mode"] = "batch"
-    if data["method"] in single_methods:
-        data["mode"] = "single"
     try:
         await _exponential_backoff(client.load_markets)
         data["symbols"] = list(client.markets.keys())
+        all_methods = [
+            "fetchOrderBooks",
+            "fetch_order_books",
+            "watchOrderBooks",
+            "watch_order_books",
+        ]
+        batch_methods = [
+            "fetchOrderBookForSymbols",
+            "fetch_order_book_for_symbols",
+            "watchOrderBookForSymbols",
+            "watch_order_book_for_symbols",
+        ]
+        single_methods = [
+            "fetchOrderBook",
+            "fetch_order_book",
+            "watchOrderBook",
+            "watch_order_book",
+        ]
+        for m in all_methods + batch_methods + single_methods:
+            if desc["has"].get(m, False):
+                try:
+                    param = data["symbols"]
+                    if m in single_methods:
+                        param = param[0]
+                        await getattr(client, m)(param)
+                    elif m in batch_methods:
+                        param = param[0:5] # testing batching
+                        await getattr(client, m)(param)
+                    else:
+                        await getattr(client, m)()
+                    data["method"] = m
+                    break
+                except:
+                    continue
+        if data["method"] in all_methods:
+            data["mode"] = "all"
+        if data["method"] in batch_methods:
+            data["mode"] = "batch"
+        if data["method"] in single_methods:
+            data["mode"] = "single"
     except Exception as e:
-        data["error"] = f"[{type(e).__name__}] {e}"
+        return None
     finally:
         await client.close()
     return data
@@ -232,15 +241,12 @@ async def _run():
             "coinbaseexchange",
         ]
     ]
-    clients = [getattr(ccxt, exchange)() for exchange in exchanges]
-    clients = [
-        client for client in clients if not client.describe().get("alias", False)
-    ]
     tasks = []
-    for client in clients:
-        tasks += [_process_exchange(client)]
+    for exchange in exchanges:
+        tasks += [_process_exchange(exchange)]
 
     data = await asyncio.gather(*tasks)
+    data = [entry for entry in data if entry is not None]
     filtered_symbol_list = _filter_symbols(data)
     filtered_symbols = [entry["symbol"] for entry in filtered_symbol_list]
     data = list(_filter_symbols_in_exchanges(data, filtered_symbols))
