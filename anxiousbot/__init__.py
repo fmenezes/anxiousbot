@@ -3,6 +3,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from types import CoroutineType
+import traceback
 
 import boto3
 import ccxt.pro as ccxt
@@ -29,6 +30,7 @@ def _get_log_handler(extra=None):
         "symbol",
         "pathname",
         "lineno",
+        "exc_formatted",
     ]
     if extra is not None:
         attrs += extra.keys()
@@ -53,6 +55,18 @@ def _log_record_factory(log_factory=None, extra=None):
 
     def _factory(*args, **kwargs):
         record = log_factory(*args, **kwargs)
+
+        if isinstance(record.exc_info, BaseException):
+            try:
+                record.exc_formatted = ''.join(traceback.format_exception(record.exc_info))
+            except:
+                pass
+        if isinstance(record.exc_info, tuple):
+            try:
+                record.exc_formatted = ''.join(traceback.format_exception(record.exc_info[1]))
+            except:
+                pass
+
         try:
             record.taskName = asyncio.current_task().get_name()
         except Exception:
