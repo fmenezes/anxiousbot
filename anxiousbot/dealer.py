@@ -288,7 +288,7 @@ class Dealer(App):
 
         if new_event["type"] != "noop":
             async with self._bot_event_lock:
-                self._bot_events += new_event
+                self._bot_events += [new_event]
 
     async def _process_bot_events(self):
         while True:
