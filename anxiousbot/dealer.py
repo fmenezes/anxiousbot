@@ -283,6 +283,7 @@ class Dealer(App):
     async def _watch_deals(self, symbol, clients, bot_queue):
         while True:
             try:
+                start = datetime.now()
                 self.logger.debug(
                     f"checking deals {symbol}...", extra={"symbol": symbol}
                 )
@@ -292,14 +293,21 @@ class Dealer(App):
                     quote_coin: self.memcache_client.get(f"/balance/{quote_coin}", 0.0),
                 }
 
+                tasks = []
                 for buy_client_id, sell_client_id in [
                     (a, b) for a in clients for b in clients if a != b
                 ]:
                     asks = self.memcache_client.get(f"/asks/{symbol}/{buy_client_id}")
-                    bids = self.memcache_client.get(f"/bids/{symbol}/{sell_client_id}")
                     if asks is None or len(asks) == 0:
+                        self.logger.debug(
+                            f"missed deals for {symbol} / {buy_client_id} (buy) no asks", extra={"symbol": symbol}
+                        )
                         continue
+                    bids = self.memcache_client.get(f"/bids/{symbol}/{sell_client_id}")
                     if bids is None or len(bids) == 0:
+                        self.logger.debug(
+                            f"missed deals for {symbol} / {sell_client_id} (sell) no bids", extra={"symbol": symbol}
+                        )
                         continue
                     deal = Deal(
                         symbol,
@@ -309,8 +317,13 @@ class Dealer(App):
                         bids,
                     )
                     deal.calculate(balance)
-                    await self._process_deal(deal, bot_queue)
+                    tasks += [self._process_deal(deal, bot_queue)]
 
+                await asyncio.gather(*tasks)
+                duration = datetime.now() - start
+                self.logger.debug(
+                    f"checked deals {symbol}, took {duration}", extra={"symbol": symbol, "duration": str(duration)}
+                )
                 await asyncio.sleep(0.5)
             except Exception as e:
                 self.logger.exception(
