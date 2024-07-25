@@ -229,6 +229,44 @@ resource "aws_elasticache_cluster" "cache_cluster" {
   }
 }
 
+resource "aws_cloudwatch_dashboard" "main" {
+  dashboard_name = "anxiousbot-errors"
+
+  dashboard_body = jsonencode(
+    {
+      "widgets": [
+        {
+          "type": "log",
+          "x": 0,
+          "y": 0,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "query": "SOURCE 'anxiousbot-logs' | fields @timestamp, msg, taskName, config\n| sort @timestamp desc\n| filter levelname = \"ERROR\" and name = 'dealer'\n| limit 100",
+            "region": "us-east-1",
+            "title": "Dealer Errors",
+            "view": "table"
+          }
+        },
+        {
+          "type": "log",
+          "x": 0,
+          "y": 6,
+          "width": 24,
+          "height": 6,
+          "properties": {
+            "query": "SOURCE 'anxiousbot-logs' | fields @timestamp, msg, taskName, config\n| sort @timestamp desc\n| filter levelname = \"ERROR\" and name = 'updater'\n| limit 100",
+            "region": "us-east-1",
+            "stacked": false,
+            "view": "table",
+            "title": "Updater Errors"
+          }
+        }
+      ]
+    }
+  )
+}
+
 data "external" "count_config_files" {
   program = ["bash", "count_config_files.sh"]
 }
