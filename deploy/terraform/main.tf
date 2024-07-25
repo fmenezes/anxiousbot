@@ -242,7 +242,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           "width": 24,
           "height": 6,
           "properties": {
-            "query": "SOURCE 'anxiousbot-logs' | fields @timestamp, msg, taskName, config\n| sort @timestamp desc\n| filter levelname = \"ERROR\" and name = 'dealer'\n| limit 100",
+            "query": "SOURCE 'anxiousbot-logs' | fields @timestamp, msg, taskName, config, exc_formatted\n| sort @timestamp desc\n| filter levelname = \"ERROR\" and name = 'dealer'\n| limit 100",
             "region": "us-east-1",
             "title": "Dealer Errors",
             "view": "table"
@@ -255,7 +255,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           "width": 24,
           "height": 6,
           "properties": {
-            "query": "SOURCE 'anxiousbot-logs' | fields @timestamp, msg, taskName, config\n| sort @timestamp desc\n| filter levelname = \"ERROR\" and name = 'updater'\n| limit 100",
+            "query": "SOURCE 'anxiousbot-logs' | fields @timestamp, msg, taskName, config, exc_formatted\n| sort @timestamp desc\n| filter levelname = \"ERROR\" and name = 'updater'\n| limit 100",
             "region": "us-east-1",
             "stacked": false,
             "view": "table",
