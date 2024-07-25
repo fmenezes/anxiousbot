@@ -22,7 +22,11 @@ class Notifier(App):
                                 event = await bot_queue.get()
                                 if event["type"] not in ["open", "close"]:
                                     continue
-                                icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
+                                icon = (
+                                    "\U0001F7E2"
+                                    if event["type"] == "open"
+                                    else "\U0001F534"
+                                )
                                 msg = f"{icon} {event['message']}"
                                 await bot.send_message(
                                     chat_id=self.bot_chat_id, text=msg

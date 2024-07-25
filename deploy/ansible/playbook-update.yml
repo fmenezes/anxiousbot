@@ -1,0 +1,19 @@
+---
+- name: Update instances
+  hosts: tag_Project_anxiousbot
+  become: yes
+  vars_files:
+    - vars/secrets.yml
+
+  tasks:
+    - name: Clone the GitHub repository
+      git:
+        repo: 'https://{{ github_token }}@github.com/fmenezes/anxiousbot.git'
+        dest: /opt/anxiousbot
+
+    - name: Enable and start Anxiousbot Service
+      systemd:
+        name: anxiousbot
+        state: restarted
+        enabled: yes
+

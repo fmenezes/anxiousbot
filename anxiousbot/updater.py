@@ -1,14 +1,7 @@
 import asyncio
-import json
-import os
-import sys
-import traceback
 from datetime import datetime
 
-from pymemcache import serde
-from pymemcache.client.base import Client as MemcacheClient
-
-from anxiousbot import App, closing, get_logger
+from anxiousbot import App, closing
 
 DEFAULT_EXPIRE_BOOK_ORDERS = 60
 
@@ -61,7 +54,11 @@ class Updater(App):
                             extra={
                                 "exchange": setting["exchange"],
                                 "duration": duration,
-                                "symbol": setting["symbols"][0] if setting["mode"] == "single" else None,
+                                "symbol": (
+                                    setting["symbols"][0]
+                                    if setting["mode"] == "single"
+                                    else None
+                                ),
                             },
                         )
             except Exception as e:

@@ -1,16 +1,10 @@
 import asyncio
 import copy
 import csv
-import json
 import os
-import sys
-import traceback
 from datetime import datetime
 
-from pymemcache import serde
-from pymemcache.client.base import Client as MemcacheClient
-
-from anxiousbot import App, closing, get_logger, split_coin
+from anxiousbot import App, split_coin
 
 
 class Deal:

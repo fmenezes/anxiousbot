@@ -19,7 +19,16 @@ class CustomFormatter(CloudWatchLogFormatter):
 
 
 def _get_log_handler(extra=None):
-    attrs = ["name", "levelname", "taskName", "exchange", "duration", "symbol", "pathname", "lineno"]
+    attrs = [
+        "name",
+        "levelname",
+        "taskName",
+        "exchange",
+        "duration",
+        "symbol",
+        "pathname",
+        "lineno",
+    ]
     if extra is not None:
         attrs += extra.keys()
     formatter = CustomFormatter(add_log_record_attrs=attrs)

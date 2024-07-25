@@ -98,7 +98,7 @@ async def _process_exchange(exchange):
                         param = param[0]
                         await getattr(client, m)(param)
                     elif m in batch_methods:
-                        param = param[0:5] # testing batching
+                        param = param[0:5]  # testing batching
                         await getattr(client, m)(param)
                     else:
                         await getattr(client, m)()
