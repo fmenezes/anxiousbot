@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from types import CoroutineType
 
 import boto3
 import ccxt.pro as ccxt
@@ -111,7 +112,11 @@ class App:
                 raise e
             except Exception as e:
                 await asyncio.sleep(delay)
-                last_exception = e
+                if isinstance(e, CoroutineType):
+                    last_exception = await e
+                else:
+                    last_exception = e
+                self.logger.exception(e)
         raise last_exception
 
     async def setup_exchange(self, exchange_id, required_markets=False):
@@ -150,6 +155,9 @@ class App:
         self.clients.append(client)
         return client
 
+    async def close_exchange(self, client):
+        return await client.close()
+
     async def close(self):
         for client in self.clients:
-            await client.close()
+            self.close_exchange(client)

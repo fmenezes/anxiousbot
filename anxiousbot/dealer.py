@@ -4,6 +4,8 @@ import csv
 import os
 from datetime import datetime
 
+from telegram import Bot
+
 from anxiousbot import App, split_coin
 
 
@@ -181,6 +183,14 @@ class Deal:
 
 
 class Dealer(App):
+    def __init__(self, bot_token, bot_chat_id, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._bot_token = bot_token
+        self._bot_chat_id = bot_chat_id
+        self._bot_events = []
+        self._bot_event_lock = asyncio.Lock()
+        self._bot = Bot(self._bot_token)
+
     def _write_deal_xml(self, deal_event):
         if deal_event["type"] != "close":
             return
@@ -229,7 +239,7 @@ class Dealer(App):
             {"type": "deal", **deal_event},
         )
 
-    async def _process_deal(self, deal, bot_queue):
+    async def _process_deal(self, deal):
         current_event = self.memcache_client.get(
             f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
             {"ts_open": str(datetime.now()), "type": "noop", "threshold": False},
@@ -276,11 +286,35 @@ class Dealer(App):
         )
 
         if new_event["type"] != "noop":
-            self._log_deal_event(new_event)
-            self._write_deal_xml(new_event)
-            await bot_queue.put(new_event)
+            async with self._bot_event_lock:
+                self._bot_events += new_event
 
-    async def _watch_deals(self, symbol, clients, bot_queue):
+    async def _process_bot_events(self):
+        while True:
+            try:
+                async with self._bot_event_lock:
+                    if len(self._bot_events) == 0:
+                        event = None
+                    else:
+                        event = self._bot_events[0]
+                        self._bot_events = self._bot_events[1:]
+                if event is None:
+                    await asyncio.sleep(1)
+                    continue
+                self._log_deal_event(event)
+                self._write_deal_xml(event)
+                if event["type"] not in ["open", "close"]:
+                    continue
+                icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
+                msg = f"{icon} {event['message']}"
+                await self._bot.send_message(chat_id=self._bot_chat_id, text=msg)
+            except Exception as e:
+                self.logger.exception(
+                    f"An error occurred: [{type(e).__name__}] {str(e)}"
+                )
+                await asyncio.sleep(0.5)
+
+    async def _watch_deals(self, symbol, client_ids):
         while True:
             try:
                 start = datetime.now()
@@ -295,18 +329,20 @@ class Dealer(App):
 
                 tasks = []
                 for buy_client_id, sell_client_id in [
-                    (a, b) for a in clients for b in clients if a != b
+                    (a, b) for a in client_ids for b in client_ids if a != b
                 ]:
                     asks = self.memcache_client.get(f"/asks/{symbol}/{buy_client_id}")
                     if asks is None or len(asks) == 0:
                         self.logger.debug(
-                            f"missed deals for {symbol} / {buy_client_id} (buy) no asks", extra={"symbol": symbol}
+                            f"missed deals for {symbol} / {buy_client_id} (buy) no asks",
+                            extra={"symbol": symbol},
                         )
                         continue
                     bids = self.memcache_client.get(f"/bids/{symbol}/{sell_client_id}")
                     if bids is None or len(bids) == 0:
                         self.logger.debug(
-                            f"missed deals for {symbol} / {sell_client_id} (sell) no bids", extra={"symbol": symbol}
+                            f"missed deals for {symbol} / {sell_client_id} (sell) no bids",
+                            extra={"symbol": symbol},
                         )
                         continue
                     deal = Deal(
@@ -317,12 +353,13 @@ class Dealer(App):
                         bids,
                     )
                     deal.calculate(balance)
-                    tasks += [self._process_deal(deal, bot_queue)]
+                    tasks += [self._process_deal(deal)]
 
                 await asyncio.gather(*tasks)
                 duration = datetime.now() - start
                 self.logger.debug(
-                    f"checked deals {symbol}, took {duration}", extra={"symbol": symbol, "duration": str(duration)}
+                    f"checked deals {symbol}, took {duration}",
+                    extra={"symbol": symbol, "duration": str(duration)},
                 )
                 await asyncio.sleep(0.5)
             except Exception as e:
@@ -331,22 +368,30 @@ class Dealer(App):
                 )
 
     async def _init_exchanges(self, config):
-        self.exchanges = {}
         all_exchanges = []
         for symbol, exchanges in config["symbols"].items():
             all_exchanges += exchanges
         all_exchanges = list(set(all_exchanges))
+        tasks = []
         for exchange_id in all_exchanges:
-            self.exchanges[exchange_id] = await self.setup_exchange(exchange_id)
+            tasks += [self.setup_exchange(exchange_id)]
+        results = await asyncio.gather(*tasks)
+        self.exchanges = dict([(entry.id, entry) for entry in results])
 
-    async def run(self, config, bot_queue):
+    async def close_exchange(self, client):
+        del self.exchanges[client.id]
+        return await super().close_exchange(client)
+
+    async def run(self, config):
         self.logger.info(f"Dealer started")
         try:
+            await self._bot.initialize()
+            self.logger.debug(f"Bot initialized")
             await self._init_exchanges(config["dealer"])
 
-            tasks = []
+            tasks = [self._process_bot_events()]
             for symbol, exchanges in config["dealer"]["symbols"].items():
-                tasks += [self._watch_deals(symbol, exchanges, bot_queue)]
+                tasks += [self._watch_deals(symbol, exchanges)]
 
             await asyncio.gather(*tasks)
             self.logger.info(f"Dealer exited")
@@ -355,3 +400,7 @@ class Dealer(App):
             self.logger.info(f"Dealer exited with error")
             self.logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
             return 1
+
+    async def close(self):
+        await super().close()
+        await self._bot.close()
