@@ -10,6 +10,7 @@ import ccxt.pro as ccxt
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 from telegram import Bot
+from telegram.error import RetryAfter
 
 from anxiousbot import get_logger, split_coin
 
@@ -311,9 +312,26 @@ class Dealer:
         )
 
         if new_event["type"] != "noop":
+            self._log_deal_event(new_event)
+            self._write_deal_xml(new_event)
             async with self._bot_event_lock:
                 self._bot_events += [new_event]
-            self._log_deal_event(new_event)
+
+    async def _send_message(self, event):
+        icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
+        msg = f"{icon} {event['message']}"
+        try:
+            await self._bot.send_message(
+                chat_id=self._bot_chat_id,
+                text=msg,
+                read_timeout=35,
+                write_timeout=35,
+                connect_timeout=35,
+                pool_timeout=35,
+            )
+        except RetryAfter as e:
+            await asyncio.sleep(e.retry_after)
+            raise e
 
     async def _process_bot_events(self):
         while True:
@@ -327,14 +345,9 @@ class Dealer:
                 if event is None:
                     await asyncio.sleep(1)
                     continue
-                self._write_deal_xml(event)
                 if event["type"] not in ["open", "close"]:
                     continue
-                icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
-                msg = f"{icon} {event['message']}"
-                await self._exponential_backoff(
-                    self._bot.send_message, chat_id=self._bot_chat_id, text=msg, read_timeout=35, write_timeout=35, connect_timeout=35, pool_timeout=35
-                )
+                await self._exponential_backoff(self.send_message, event)
             except Exception as e:
                 self.logger.exception(
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
