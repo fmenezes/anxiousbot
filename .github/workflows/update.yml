@@ -1,0 +1,35 @@
+name: Update Infrastructure
+
+on:
+  workflow_dispatch:
+jobs:
+  ansible:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./deploy/ansible
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Ansible
+        run: sudo apt-get update && sudo apt-get install -y ansible
+
+      - run: sudo pipx inject ansible-core botocore boto3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - run: echo "$VAULT_PASS" > .vault_pass
+        env:
+          VAULT_PASS: ${{ secrets.VAULT_PASS }}
+
+      - run: mkdir -p  $HOME/.ssh && echo "$SSH_PRIVATE_KEY" > $HOME/.ssh/filipe.pem && sudo chmod 400 $HOME/.ssh/filipe.pem
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - run: ansible-playbook playbook-update.yml
