@@ -7,6 +7,7 @@ from datetime import datetime
 from types import CoroutineType
 
 import ccxt.pro as ccxt
+from ccxt.base.errors import RateLimitExceeded
 from pymemcache import serde
 from pymemcache.client.base import Client as MemcacheClient
 from telegram import Bot
@@ -575,6 +576,9 @@ class Dealer:
                 return await fn(*args, **kwargs)
             except asyncio.CancelledError as e:
                 raise e
+            except RateLimitExceeded as e:
+                await asyncio.sleep(60)
+                last_exception = e
             except Exception as e:
                 await asyncio.sleep(delay)
                 if isinstance(e, CoroutineType):
