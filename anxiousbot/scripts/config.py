@@ -63,17 +63,28 @@ async def _process_exchange(exchange):
     desc = client.describe()
     if desc.get("alias", False) == True:
         return None
-
     data = {
         "exchange": client.id,
         "mode": "none",
+        "describe": {
+            "has": desc.get("has"),
+            "options": desc.get("options"),
+            "fees": desc.get("fees"),
+            "commonCurrencies": desc.get("commonCurrencies"),
+        },
         "method": "fetch_order_book",
         "symbols": [],
         "limit": _limit(client.id),
     }
     try:
         await _exponential_backoff(client.load_markets)
-        data["symbols"] = list(client.markets.keys())
+        data["symbols"] = list(
+            [
+                key
+                for key, value in client.markets.items()
+                if value["spot"] == True and value["active"] == True
+            ]
+        )
         all_methods = [
             "fetchOrderBooks",
             "fetch_order_books",
@@ -121,7 +132,7 @@ async def _process_exchange(exchange):
     return data
 
 
-def _filter_symbols(data):
+def _all_symbols(data):
     marketcap = _convert(list(_read_csv("./data/marketcap.csv")), "Symbol")
 
     symbols = list(set([symbol for entry in data for symbol in entry["symbols"]]))
@@ -129,13 +140,11 @@ def _filter_symbols(data):
     symbols = [
         {
             "symbol": symbol,
-            "basecoin": symbol.split("/")[0],
-            "quotecoin": symbol.split("/")[1],
+            "basecoin": symbol.split("/")[0] if "/" in symbol else None,
+            "quotecoin": symbol.split("/")[1] if "/" in symbol else None,
         }
         for symbol in symbols
-        if symbol.endswith("/USDT")
     ]
-    print(f"symbols ending with /USDT: {len(symbols)}")
     symbols = [
         {
             "exchanges": [
@@ -147,8 +156,6 @@ def _filter_symbols(data):
         }
         for entry in symbols
     ]
-    symbols = [entry for entry in symbols if len(entry["exchanges"]) > 1]
-    print(f"symbols with more than one exchange: {len(symbols)}")
     symbols = [
         {"marketcap": marketcap.get(entry["basecoin"], {}).get("#"), **entry}
         for entry in symbols
@@ -158,6 +165,16 @@ def _filter_symbols(data):
             entry["marketcap"] = int(entry["marketcap"])
         except:
             entry["marketcap"] = None
+
+    return symbols
+
+
+def _filter_symbols(symbols):
+    print(f"all symbols: {len(symbols)}")
+    symbols = [entry for entry in symbols if entry.get("quotecoin") == "USDT"]
+    print(f"symbols ending with /USDT: {len(symbols)}")
+    symbols = [entry for entry in symbols if len(entry["exchanges"]) > 1]
+    print(f"symbols with more than one exchange: {len(symbols)}")
     symbols = [entry for entry in symbols if entry["marketcap"] is not None]
     print(f"symbols with a marketcap ranking: {len(symbols)}")
     symbols.sort(key=lambda x: x["marketcap"])
@@ -261,8 +278,15 @@ async def _run():
         tasks += [_process_exchange(exchange)]
 
     data = await asyncio.gather(*tasks)
-    data = [entry for entry in data if entry is not None]
-    filtered_symbol_list = _filter_symbols(data)
+    data = [entry for entry in data if entry is not None and len(entry["symbols"]) > 0]
+    with open(f"./config/exchanges.json", "w") as f:
+        json.dump(_convert(data, "exchange"), fp=f, indent=2)
+    for entry in data:
+        del entry["describe"]
+    symbol_list = _all_symbols(data)
+    with open(f"./config/symbols.json", "w") as f:
+        json.dump(_convert(symbol_list, "symbol"), fp=f, indent=2)
+    filtered_symbol_list = _filter_symbols(symbol_list)
     filtered_symbols = [entry["symbol"] for entry in filtered_symbol_list]
     data = list(_filter_symbols_in_exchanges(data, filtered_symbols))
     data = _filter_exchanges(data)
