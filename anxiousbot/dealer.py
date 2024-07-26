@@ -347,7 +347,7 @@ class Dealer:
                     continue
                 if event["type"] not in ["open", "close"]:
                     continue
-                await self._exponential_backoff(self.send_message, event)
+                await self._exponential_backoff(self._send_message, event)
             except Exception as e:
                 self.logger.exception(
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
