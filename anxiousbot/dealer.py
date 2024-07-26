@@ -279,7 +279,7 @@ class Dealer(App):
             gain_type = "profit" if deal.profit >= 0 else "loss"
 
             new_event["message"] = (
-                f"Deal {event_type}, making a {gain_type} of {new_event['profit']} {quote_coin}, at {new_event['buy_exchange']} convert {new_event['buy_total_quote']} {quote_coin} to {new_event['buy_total_base']} {base_coin}, transfer to {new_event['sell_exchange']} and finally sell back to {quote_coin} for {new_event['sell_total_quote']}, took {new_event['duration']}"
+                f"Deal {event_type}, making a {gain_type} of {new_event['profit']} {quote_coin} ({new_event['profit_percentage']}%), at {new_event['buy_exchange']} convert {new_event['buy_total_quote']} {quote_coin} to {new_event['buy_total_base']} {base_coin}, transfer to {new_event['sell_exchange']} and finally sell back to {quote_coin} for {new_event['sell_total_quote']}, took {new_event['duration']}"
             )
 
         self.memcache_client.set(
