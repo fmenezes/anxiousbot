@@ -42,7 +42,6 @@ class Runner:
         with open(self.config_path, "r") as f:
             config = json.load(f)
 
-        self.memcache_client.set("/balance/USDT", 100000)
         async with closing(
             Dealer(
                 memcache_client=self.memcache_client,

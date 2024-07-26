@@ -4,14 +4,13 @@ import csv
 import os
 from datetime import datetime
 from types import CoroutineType
-from pymemcache import serde
-from pymemcache.client.base import Client as MemcacheClient
-
-from telegram import Bot
-
-from anxiousbot import split_coin, get_logger
 
 import ccxt.pro as ccxt
+from pymemcache import serde
+from pymemcache.client.base import Client as MemcacheClient
+from telegram import Bot
+
+from anxiousbot import get_logger, split_coin
 
 DEFAULT_EXIPRE_DEAL_EVENTS = 60
 DEFAULT_EXPIRE_BOOK_ORDERS = 60
@@ -191,7 +190,7 @@ class Deal:
         return str(self.ts)
 
 
-class Dealer():
+class Dealer:
     def __init__(
         self,
         bot_token,
@@ -332,7 +331,9 @@ class Dealer():
                     continue
                 icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
                 msg = f"{icon} {event['message']}"
-                await self._exponential_backoff(self._bot.send_message, chat_id=self._bot_chat_id, text=msg)
+                await self._exponential_backoff(
+                    self._bot.send_message, chat_id=self._bot_chat_id, text=msg
+                )
             except Exception as e:
                 self.logger.exception(
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
@@ -457,11 +458,34 @@ class Dealer():
         try:
             await self._bot.initialize()
             self.logger.debug(f"Bot initialized")
-            
-            tasks = [asyncio.create_task(self._process_bot_events(), name="_process_bot_events"), asyncio.create_task(self._watch_balance(), name="_watch_balance")]
-            exchange_ids = list(set([id for id_list in list(config["dealer"]["symbols"].values()) for id in id_list]))
-            tasks += [asyncio.create_task(self._setup_exchange(id), name=f"_setup_exchange_{id}") for id in exchange_ids]
-            tasks += [asyncio.create_task(self._watch_deals(symbol), name=f"_watch_deals_{symbol}") for symbol in config["dealer"]["symbols"].keys()]
+
+            tasks = [
+                asyncio.create_task(
+                    self._process_bot_events(), name="_process_bot_events"
+                ),
+                asyncio.create_task(self._watch_balance(), name="_watch_balance"),
+            ]
+            exchange_ids = list(
+                set(
+                    [
+                        id
+                        for id_list in list(config["dealer"]["symbols"].values())
+                        for id in id_list
+                    ]
+                )
+            )
+            tasks += [
+                asyncio.create_task(
+                    self._setup_exchange(id), name=f"_setup_exchange_{id}"
+                )
+                for id in exchange_ids
+            ]
+            tasks += [
+                asyncio.create_task(
+                    self._watch_deals(symbol), name=f"_watch_deals_{symbol}"
+                )
+                for symbol in config["dealer"]["symbols"].keys()
+            ]
             i = 0
             for setting in config["updater"]:
                 tasks += [
@@ -480,9 +504,10 @@ class Dealer():
             return 1
 
     async def close(self):
-        tasks = [client.close() for client in self.exchanges.values()] + [self._bot.close()]
+        tasks = [client.close() for client in self.exchanges.values()] + [
+            self._bot.close()
+        ]
         await asyncio.gather(*tasks)
-
 
     async def _exponential_backoff(self, fn, *args, **kwargs):
         backoff = [1, 2, 4, 8]
