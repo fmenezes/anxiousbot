@@ -291,6 +291,7 @@ class Dealer(App):
         if new_event["type"] != "noop":
             async with self._bot_event_lock:
                 self._bot_events += [new_event]
+            self._log_deal_event(new_event)
 
     async def _process_bot_events(self):
         while True:
@@ -304,7 +305,6 @@ class Dealer(App):
                 if event is None:
                     await asyncio.sleep(1)
                     continue
-                self._log_deal_event(event)
                 self._write_deal_xml(event)
                 if event["type"] not in ["open", "close"]:
                     continue
