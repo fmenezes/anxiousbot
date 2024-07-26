@@ -1,7 +1,7 @@
 import asyncio
 import copy
-import json
 import csv
+import json
 import os
 from datetime import datetime
 from types import CoroutineType
@@ -68,39 +68,39 @@ class Deal:
             max_buyable_base = current_balance_quote / buy_price
 
             # Ensure buy price is less than or equal to sell price for a match
-            if buy_price < sell_price:
-                self.buy_price_min = min(self.buy_price_min, buy_price)
-                self.buy_price_max = max(self.buy_price_max, buy_price)
-
-                self.sell_price_min = min(self.sell_price_min, sell_price)
-                self.sell_price_max = max(self.sell_price_max, sell_price)
-
-                matched_amount_base = min(
-                    max_buyable_base, buy_amount_base, sell_amount_base
-                )
-
-                if matched_amount_base > 0:
-                    self.buy_orders += [buy_price, matched_amount_base]
-                    self.sell_orders += [sell_price, matched_amount_base]
-
-                    self.buy_total_base += matched_amount_base
-                    self.buy_total_quote += matched_amount_base * buy_price
-                    self.sell_total_quote += matched_amount_base * sell_price
-
-                    # Update the amounts
-                    buy_asks[buy_index][1] -= matched_amount_base
-                    sell_bids[sell_index][1] -= matched_amount_base
-                    balance[quote_coin] -= matched_amount_base * buy_price
-                    balance[base_coin] += matched_amount_base
-
-                # Remove orders that are fully matched
-                if buy_asks[buy_index][1] <= 0:
-                    buy_index += 1
-                if sell_bids[sell_index][1] <= 0:
-                    sell_index += 1
-            else:
+            if buy_price >= sell_price:
                 # If the prices don't match, exit the loop
                 break
+
+            self.buy_price_min = min(self.buy_price_min, buy_price)
+            self.buy_price_max = max(self.buy_price_max, buy_price)
+
+            self.sell_price_min = min(self.sell_price_min, sell_price)
+            self.sell_price_max = max(self.sell_price_max, sell_price)
+
+            matched_amount_base = min(
+                max_buyable_base, buy_amount_base, sell_amount_base
+            )
+
+            if matched_amount_base > 0:
+                self.buy_orders += [buy_price, matched_amount_base]
+                self.sell_orders += [sell_price, matched_amount_base]
+
+                self.buy_total_base += matched_amount_base
+                self.buy_total_quote += matched_amount_base * buy_price
+                self.sell_total_quote += matched_amount_base * sell_price
+
+                # Update the amounts
+                buy_asks[buy_index][1] -= matched_amount_base
+                sell_bids[sell_index][1] -= matched_amount_base
+                balance[quote_coin] -= matched_amount_base * buy_price
+                balance[base_coin] += matched_amount_base
+
+            # Remove orders that are fully matched
+            if buy_asks[buy_index][1] <= 0:
+                buy_index += 1
+            if sell_bids[sell_index][1] <= 0:
+                sell_index += 1
 
     @property
     def profit(self):
@@ -419,6 +419,7 @@ class Dealer:
                         order_book = await self._exponential_backoff(
                             client.watch_order_book_for_symbols, param
                         )
+
                 def update_order_book(order_book, symbol):
                     if "asks" in order_book:
                         self.memcache_client.set(
@@ -438,14 +439,15 @@ class Dealer:
                         extra={
                             "exchange": setting["exchange"],
                             "duration": duration,
-                            "symbol": symbol
+                            "symbol": symbol,
                         },
                     )
+
                 if setting["mode"] == "all" or setting["mode"] == "batch":
                     for symbol, order in order_book.items():
                         update_order_book(order, symbol)
                 else:
-                    update_order_book(order_book, order_book['symbol'])
+                    update_order_book(order_book, order_book["symbol"])
             except Exception as e:
                 self.logger.exception(e, extra={"exchange": setting["exchange"]})
             self.logger.debug(
@@ -462,20 +464,38 @@ class Dealer:
             return
         await self._bot.initialize()
 
-        with open('./config/exchanges.json', 'r') as f:
+        with open("./config/exchanges.json", "r") as f:
             self.exchanges_param = json.load(f)
 
-        with open('./config/symbols.json', 'r') as f:
+        with open("./config/symbols.json", "r") as f:
             self.symbols_param = json.load(f)
 
         self.initialized = True
 
     def _exchange_ids(self, symbols):
-        return list(set([exchange for symbol in symbols for exchange in self.symbols_param[symbol]["exchanges"]]))
+        return list(
+            set(
+                [
+                    exchange
+                    for symbol in symbols
+                    for exchange in self.symbols_param[symbol]["exchanges"]
+                ]
+            )
+        )
 
     def _update_settings(self, symbols):
         ids = self._exchange_ids(symbols)
-        settings = [{**self.exchanges_param[id], "symbols": [symbol for symbol in self.exchanges_param[id]["symbols"] if symbol in symbols]} for id in ids]
+        settings = [
+            {
+                **self.exchanges_param[id],
+                "symbols": [
+                    symbol
+                    for symbol in self.exchanges_param[id]["symbols"]
+                    if symbol in symbols
+                ],
+            }
+            for id in ids
+        ]
         settings = [entry for entry in settings if len(entry["symbols"]) > 0]
         for setting in settings:
             match setting["mode"]:
@@ -486,7 +506,6 @@ class Dealer:
                 case "single":
                     for symbol in setting["symbols"]:
                         yield {**setting, "symbols": [symbol]}
-
 
     async def run(self, config):
         self.logger.info(f"Dealer started")
@@ -518,9 +537,7 @@ class Dealer:
                 if setting["mode"] == "single":
                     task_name += f"_{setting['symbols'][0]}"
                 tasks += [
-                    asyncio.create_task(
-                        self._watch_order_book(setting), name=task_name
-                    )
+                    asyncio.create_task(self._watch_order_book(setting), name=task_name)
                 ]
 
             await asyncio.gather(*tasks)
@@ -555,6 +572,9 @@ class Dealer:
         raise last_exception
 
     async def _setup_exchange(self, exchange_id):
+        if exchange_id in self.exchanges:
+            return self.exchanges[exchange_id]
+
         api_key = os.getenv(f"{exchange_id.upper()}_API_KEY")
         secret = os.getenv(f"{exchange_id.upper()}_SECRET")
         passphrase = os.getenv(f"{exchange_id.upper()}_PASSPHRASE")

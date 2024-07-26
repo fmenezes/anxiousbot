@@ -9,7 +9,9 @@ from dotenv import load_dotenv
 
 def _filter_symbols(symbols):
     print(f"all symbols: {len(symbols)}")
-    symbols = [entry for key, entry in symbols.items() if entry.get("quotecoin") == "USDT"]
+    symbols = [
+        entry for key, entry in symbols.items() if entry.get("quotecoin") == "USDT"
+    ]
     print(f"symbols ending with /USDT: {len(symbols)}")
     symbols = [entry for entry in symbols if len(entry["exchanges"]) > 1]
     print(f"symbols with more than one exchange: {len(symbols)}")
@@ -31,8 +33,8 @@ def _split_machines(d, count=None):
             new_item = data[0]
             data = data[1:]
         else:
-            new_item = data[len(data)-1]
-            data = data[:len(data)-1]
+            new_item = data[len(data) - 1]
+            data = data[: len(data) - 1]
         new_item = new_item["symbol"]
         if len(result) <= machine_id:
             result.append([new_item])

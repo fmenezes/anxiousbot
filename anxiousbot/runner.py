@@ -19,9 +19,8 @@ class Runner:
 
     async def run(self):
         logger = get_logger(name=__name__, extra={"config": self.config_path})
-        memcache_client = MemcacheClient(
-            self.cache_endpoint, serde=serde.pickle_serde
-        )
+        memcache_client = MemcacheClient(self.cache_endpoint, serde=serde.pickle_serde)
+
         def _sys_excepthook(exc_type, exc_value, exc_traceback):
             if issubclass(exc_type, KeyboardInterrupt):
                 sys.__excepthook__(exc_type, exc_value, exc_traceback)
