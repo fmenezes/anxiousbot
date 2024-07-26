@@ -423,13 +423,13 @@ class Dealer:
                 def update_order_book(order_book, symbol):
                     if "asks" in order_book:
                         self.memcache_client.set(
-                            f"/asks/{order_book['symbol']}/{setting['exchange']}",
+                            f"/asks/{symbol}/{setting['exchange']}",
                             order_book["asks"],
                             expire=self.expire_book_orders,
                         )
                     if "bids" in order_book:
                         self.memcache_client.set(
-                            f"/bids/{order_book['symbol']}/{setting['exchange']}",
+                            f"/bids/{symbol}/{setting['exchange']}",
                             order_book["bids"],
                             expire=self.expire_book_orders,
                         )
@@ -445,7 +445,8 @@ class Dealer:
 
                 if setting["mode"] == "all" or setting["mode"] == "batch":
                     for symbol, order in order_book.items():
-                        update_order_book(order, symbol)
+                        if symbol in self.config["symbols"]:
+                            update_order_book(order, symbol)
                 else:
                     update_order_book(order_book, order_book["symbol"])
             except Exception as e:
@@ -508,6 +509,7 @@ class Dealer:
                         yield {**setting, "symbols": [symbol]}
 
     async def run(self, config):
+        self.config = config
         self.logger.info(f"Dealer started")
         symbols = config["symbols"]
         try:
