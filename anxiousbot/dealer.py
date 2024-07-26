@@ -346,7 +346,7 @@ class Dealer:
                 if event is None:
                     await asyncio.sleep(1)
                     continue
-                if event["type"] not in ["open", "close"]:
+                if event["type"] not in ["close"]:
                     continue
                 await self._exponential_backoff(self._send_message, event)
             except Exception as e:
