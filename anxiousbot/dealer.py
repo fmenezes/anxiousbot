@@ -336,17 +336,9 @@ class Dealer(App):
                 ]:
                     asks = self.memcache_client.get(f"/asks/{symbol}/{buy_client_id}")
                     if asks is None or len(asks) == 0:
-                        self.logger.debug(
-                            f"missed deals for {symbol} / {buy_client_id} (buy) no asks",
-                            extra={"symbol": symbol},
-                        )
                         continue
                     bids = self.memcache_client.get(f"/bids/{symbol}/{sell_client_id}")
                     if bids is None or len(bids) == 0:
-                        self.logger.debug(
-                            f"missed deals for {symbol} / {sell_client_id} (sell) no bids",
-                            extra={"symbol": symbol},
-                        )
                         continue
                     deal = Deal(
                         symbol,
