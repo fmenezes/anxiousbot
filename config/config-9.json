@@ -76,89 +76,6 @@
         "poloniex",
         "wazirx",
         "whitebit"
-      ],
-      "OKT/USDT": [
-        "gate",
-        "hitbtc",
-        "mexc",
-        "okx"
-      ],
-      "DGB/USDT": [
-        "binance",
-        "bingx",
-        "bitmart",
-        "bybit",
-        "coinex",
-        "gate",
-        "hitbtc",
-        "htx",
-        "kucoin",
-        "lbank",
-        "okx",
-        "probit",
-        "upbit",
-        "wazirx"
-      ],
-      "NYM/USDT": [
-        "bingx",
-        "bitget",
-        "bitmart",
-        "bitrue",
-        "bybit",
-        "coinex",
-        "gate",
-        "hitbtc",
-        "htx",
-        "kucoin",
-        "mexc",
-        "okx",
-        "phemex",
-        "poloniex"
-      ],
-      "LEVER/USDT": [
-        "binance",
-        "bingx",
-        "bitget",
-        "bitrue",
-        "bybit",
-        "coinex",
-        "gate",
-        "hitbtc",
-        "mexc",
-        "phemex",
-        "wazirx"
-      ],
-      "RDNT/USDT": [
-        "ascendex",
-        "binance",
-        "bingx",
-        "bitget",
-        "bitmart",
-        "bitrue",
-        "bybit",
-        "coinex",
-        "gate",
-        "hitbtc",
-        "htx",
-        "kucoin",
-        "lbank",
-        "mexc",
-        "okx",
-        "phemex",
-        "poloniex",
-        "whitebit",
-        "woo"
-      ],
-      "QKC/USDT": [
-        "binance",
-        "bingx",
-        "bitget",
-        "bitrue",
-        "coinex",
-        "gate",
-        "kucoin",
-        "mexc",
-        "wazirx"
       ]
     }
   },
@@ -168,80 +85,44 @@
       "mode": "batch",
       "method": "watchOrderBookForSymbols",
       "symbols": [
-        "FTM/USDT",
-        "OSMO/USDT",
-        "WAVES/USDT",
-        "PEOPLE/USDT",
-        "AUDIO/USDT",
-        "SLP/USDT",
-        "LUNA/USDT",
-        "DAR/USDT",
-        "KSM/USDT",
-        "QTUM/USDT",
-        "JTO/USDT",
-        "LUNC/USDT",
-        "DMTR/USDT",
-        "ENJ/USDT",
-        "VR/USDT",
-        "ORBS/USDT",
-        "FIL/USDT",
-        "GEAR/USDT",
-        "AMP/USDT",
-        "AEVO/USDT"
+        "POLYX/USDT",
+        "SEI/USDT",
+        "LPT/USDT",
+        "WBTC/USDT",
+        "AERO/USDT",
+        "USDD/USDT",
+        "LDO/USDT",
+        "AR/USDT",
+        "KCS/USDT",
+        "USDE/USDT",
+        "COMP/USDT",
+        "IMX/USDT",
+        "ETC/USDT",
+        "APT/USDT",
+        "BOME/USDT",
+        "ALT/USDT",
+        "ZRO/USDT",
+        "GALA/USDT",
+        "MASK/USDT",
+        "AVAX/USDT"
       ],
       "limit": 20
-    },
-    {
-      "exchange": "coinex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "1INCH/USDT"
-      ],
-      "limit": null
     },
     {
       "exchange": "cryptocom",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "ACH/USDT"
+        "AAVE/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "lbank",
+      "exchange": "htx",
       "mode": "single",
-      "method": "fetchOrderBook",
+      "method": "fetch_order_book",
       "symbols": [
-        "AGLD/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitrue",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "ALGO/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bingx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "AMP/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "poloniex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "API3/USDT"
+        "AKT/USDT"
       ],
       "limit": null
     },
@@ -250,34 +131,34 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "ARB/USDT"
+        "ANKR/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "poloniex",
+      "exchange": "wazirx",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "ASTR/USDT"
+        "AR/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "bingx",
+      "exchange": "htx",
       "mode": "single",
-      "method": "fetchOrderBook",
+      "method": "fetch_order_book",
       "symbols": [
-        "AURORA/USDT"
+        "ATOM/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "bingx",
+      "exchange": "woo",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "AZERO/USDT"
+        "AXS/USDT"
       ],
       "limit": null
     },
@@ -286,61 +167,7 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "BAL/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitopro",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "BCH/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "lbank",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "BIGTIME/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "poloniex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "BNB/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "poloniex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "BONE/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "probit",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "BTC/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "mexc",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "CANTO/USDT"
+        "BICO/USDT"
       ],
       "limit": null
     },
@@ -349,48 +176,39 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "CGPT/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "mexc",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "CKB/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "mexc",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "CORE/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "blockchaincom",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "CRV/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "coinex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "CUDOS/USDT"
+        "BRETT/USDT"
       ],
       "limit": null
     },
     {
       "exchange": "lbank",
+      "mode": "single",
+      "method": "fetchOrderBook",
+      "symbols": [
+        "CAKE/USDT"
+      ],
+      "limit": null
+    },
+    {
+      "exchange": "whitebit",
+      "mode": "single",
+      "method": "fetchOrderBook",
+      "symbols": [
+        "CHZ/USDT"
+      ],
+      "limit": null
+    },
+    {
+      "exchange": "cryptocom",
+      "mode": "single",
+      "method": "fetchOrderBook",
+      "symbols": [
+        "CRO/USDT"
+      ],
+      "limit": null
+    },
+    {
+      "exchange": "coinex",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
@@ -399,47 +217,11 @@
       "limit": null
     },
     {
-      "exchange": "bingx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "DENT/USDT"
-      ],
-      "limit": null
-    },
-    {
       "exchange": "lbank",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "DMTR/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "cryptocom",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "DOT/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "gate",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "ECOX/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "woo",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "ENA/USDT"
+        "DOGE/USDT"
       ],
       "limit": null
     },
@@ -448,16 +230,16 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "EOS/USDT"
+        "DYM/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "wazirx",
+      "exchange": "p2b",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "ETH/USDT"
+        "ENJ/USDT"
       ],
       "limit": null
     },
@@ -466,12 +248,21 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "EWT/USDT"
+        "ETC/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "coinex",
+      "exchange": "mexc",
+      "mode": "single",
+      "method": "fetchOrderBook",
+      "symbols": [
+        "ETHW/USDT"
+      ],
+      "limit": null
+    },
+    {
+      "exchange": "wazirx",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
@@ -480,16 +271,7 @@
       "limit": null
     },
     {
-      "exchange": "coinex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "FTM/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "lbank",
+      "exchange": "poloniex",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
@@ -498,29 +280,11 @@
       "limit": null
     },
     {
-      "exchange": "bitrue",
+      "exchange": "phemex",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "GLMR/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bingx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "GNS/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "woo",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "GRT/USDT"
+        "GNO/USDT"
       ],
       "limit": null
     },
@@ -529,21 +293,12 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "HNT/USDT"
+        "HOT/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "bitfinex2",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "ICP/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "probit",
+      "exchange": "woo",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
@@ -552,74 +307,20 @@
       "limit": null
     },
     {
-      "exchange": "htx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "IOTA/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bingx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "JTO/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "wazirx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "KEEP/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "coinex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "KUB/USDT"
-      ],
-      "limit": null
-    },
-    {
       "exchange": "cryptocom",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "LINK/USDT"
+        "JASMY/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "htx",
+      "exchange": "gate",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "LOOM/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitrue",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "LSK/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "coinex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "LUNC/USDT"
+        "KAVA/USDT"
       ],
       "limit": null
     },
@@ -628,21 +329,30 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "MANEKI/USDT"
+        "LDO/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "whitebit",
+      "exchange": "htx",
+      "mode": "single",
+      "method": "fetch_order_book",
+      "symbols": [
+        "LTC/USDT"
+      ],
+      "limit": null
+    },
+    {
+      "exchange": "cex",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "MATIC/USDT"
+        "MANTA/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "bingx",
+      "exchange": "gate",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
@@ -651,38 +361,11 @@
       "limit": null
     },
     {
-      "exchange": "currencycom",
+      "exchange": "cex",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "MKR/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "cryptocom",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "MOVR/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "poloniex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "NAKA/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitrue",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "NKN/USDT"
+        "MNT/USDT"
       ],
       "limit": null
     },
@@ -691,61 +374,7 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "NPXS/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "mexc",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "OKB/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "coinex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "ONG/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "phemex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "ORBS/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "cryptocom",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "PAXG/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "okx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "PERP/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitrue",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "POND/USDT"
+        "NEO/USDT"
       ],
       "limit": null
     },
@@ -754,25 +383,16 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "PRIME/USDT"
+        "OM/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "htx",
+      "exchange": "mexc",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "PYTH/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "gate",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "RACA/USDT"
+        "OSMO/USDT"
       ],
       "limit": null
     },
@@ -781,7 +401,7 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "REDO/USDT"
+        "PONKE/USDT"
       ],
       "limit": null
     },
@@ -790,12 +410,12 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "RLC/USDT"
+        "QTUM/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "probit",
+      "exchange": "bingx",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
@@ -804,7 +424,7 @@
       "limit": null
     },
     {
-      "exchange": "coinex",
+      "exchange": "phemex",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
@@ -813,119 +433,20 @@
       "limit": null
     },
     {
-      "exchange": "gate",
+      "exchange": "blockchaincom",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "SFP/USDT"
+        "SNX/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "probit",
+      "exchange": "htx",
       "mode": "single",
-      "method": "fetchOrderBook",
+      "method": "fetch_order_book",
       "symbols": [
-        "SLP/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "lbank",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "SOL/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "whitebit",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "STEEM/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "wazirx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "STPT/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "poloniex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "SUN/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "poloniex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "SXP/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "phemex",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "TEL/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "mexc",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "TNSR/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bingx",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "TRU/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "probit",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "TUSD/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "whitebit",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "UNI/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitrue",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "VANRY/USDT"
+        "STETH/USDT"
       ],
       "limit": null
     },
@@ -934,34 +455,16 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "VVS/USDT"
+        "T/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "phemex",
+      "exchange": "gate",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "WBTC/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "woo",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "WLD/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitrue",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "XAUT/USDT"
+        "TRIBE/USDT"
       ],
       "limit": null
     },
@@ -970,7 +473,16 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "XEM/USDT"
+        "TWT/USDT"
+      ],
+      "limit": null
+    },
+    {
+      "exchange": "probit",
+      "mode": "single",
+      "method": "fetchOrderBook",
+      "symbols": [
+        "USDD/USDT"
       ],
       "limit": null
     },
@@ -979,43 +491,43 @@
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "XRD/USDT"
-      ],
-      "limit": null
-    },
-    {
-      "exchange": "bitopro",
-      "mode": "single",
-      "method": "fetchOrderBook",
-      "symbols": [
-        "YFI/USDT"
+        "WEMIX/USDT"
       ],
       "limit": null
     },
     {
       "exchange": "htx",
       "mode": "single",
-      "method": "fetchOrderBook",
+      "method": "fetch_order_book",
       "symbols": [
-        "ZEN/USDT"
+        "XCH/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "cryptocom",
+      "exchange": "mexc",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "ZK/USDT"
+        "XMR/USDT"
       ],
       "limit": null
     },
     {
-      "exchange": "woo",
+      "exchange": "gate",
       "mode": "single",
       "method": "fetchOrderBook",
       "symbols": [
-        "ZRX/USDT"
+        "ZEC/USDT"
+      ],
+      "limit": null
+    },
+    {
+      "exchange": "bitfinex2",
+      "mode": "single",
+      "method": "fetchOrderBook",
+      "symbols": [
+        "ZRO/USDT"
       ],
       "limit": null
     }

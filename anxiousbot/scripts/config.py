@@ -161,7 +161,7 @@ def _filter_symbols(data):
     symbols = [entry for entry in symbols if entry["marketcap"] is not None]
     print(f"symbols with a marketcap ranking: {len(symbols)}")
     symbols.sort(key=lambda x: x["marketcap"])
-    symbols = [entry for entry in symbols][:500]
+    symbols = [entry for entry in symbols][:200]
     return symbols
 
 
