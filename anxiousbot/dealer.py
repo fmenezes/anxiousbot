@@ -114,8 +114,7 @@ class Deal:
 
     @property
     def threshold(self):
-        # return self.profit > 0
-        return self.profit_percentage >= 1
+        return self.profit_percentage >= 1 and self.profit >= 10
 
     def to_dict(self):
         return {
