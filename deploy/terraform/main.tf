@@ -240,7 +240,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           "x": 0,
           "y": 0,
           "width": 24,
-          "height": 16,
+          "height": 15,
           "properties": {
             "query": "SOURCE 'anxiousbot-logs' | fields @timestamp, msg, taskName, config, exc_formatted\n| sort @timestamp desc\n| filter levelname = \"ERROR\"",
             "region": "us-east-1",
