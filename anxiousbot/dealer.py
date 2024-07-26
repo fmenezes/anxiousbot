@@ -3,12 +3,18 @@ import copy
 import csv
 import os
 from datetime import datetime
+from types import CoroutineType
+from pymemcache import serde
+from pymemcache.client.base import Client as MemcacheClient
 
 from telegram import Bot
 
-from anxiousbot import App, split_coin
+from anxiousbot import split_coin, get_logger
 
-DEFAULT_EXIPRE_DEAL_EVENT = 60
+import ccxt.pro as ccxt
+
+DEFAULT_EXIPRE_DEAL_EVENTS = 60
+DEFAULT_EXPIRE_BOOK_ORDERS = 60
 
 
 class Deal:
@@ -185,14 +191,30 @@ class Deal:
         return str(self.ts)
 
 
-class Dealer(App):
-    def __init__(self, bot_token, bot_chat_id, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class Dealer():
+    def __init__(
+        self,
+        bot_token,
+        bot_chat_id,
+        expire_book_orders=DEFAULT_EXPIRE_BOOK_ORDERS,
+        expire_deal_events=DEFAULT_EXIPRE_DEAL_EVENTS,
+        memcache_client=None,
+        logger=None,
+    ):
         self._bot_token = bot_token
         self._bot_chat_id = bot_chat_id
         self._bot_events = []
         self._bot_event_lock = asyncio.Lock()
         self._bot = Bot(self._bot_token)
+        self.expire_book_orders = expire_book_orders
+        self.expire_deal_events = expire_deal_events
+        self.exchanges = {}
+        if logger is None:
+            logger = get_logger()
+        self.logger = logger
+        if memcache_client is None:
+            memcache_client = MemcacheClient("localhost", serde=serde.pickle_serde)
+        self.memcache_client = memcache_client
 
     def _write_deal_xml(self, deal_event):
         if deal_event["type"] != "close":
@@ -285,7 +307,7 @@ class Dealer(App):
         self.memcache_client.set(
             f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
             new_event,
-            expire=DEFAULT_EXIPRE_DEAL_EVENT,
+            expire=self.expire_deal_events,
         )
 
         if new_event["type"] != "noop":
@@ -310,7 +332,7 @@ class Dealer(App):
                     continue
                 icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
                 msg = f"{icon} {event['message']}"
-                await self._bot.send_message(chat_id=self._bot_chat_id, text=msg)
+                await self._exponential_backoff(self._bot.send_message, chat_id=self._bot_chat_id, text=msg)
             except Exception as e:
                 self.logger.exception(
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
@@ -365,32 +387,86 @@ class Dealer(App):
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
                 )
 
-    async def _init_exchange(self, id):
-        self.exchanges[id] = await self.setup_exchange(id)
-
-    async def _init_exchanges(self, config):
-        all_exchanges = []
-        for symbol, exchanges in config["symbols"].items():
-            all_exchanges += exchanges
-        all_exchanges = list(set(all_exchanges))
-        tasks = []
-        self.exchanges = {}
-        for exchange_id in all_exchanges:
-            tasks += [self._init_exchange(exchange_id)]
-        await asyncio.gather(*tasks)
-
-    async def close_exchange(self, client):
+    async def _close_exchange(self, client):
         del self.exchanges[client.id]
-        return await super().close_exchange(client)
+        return await client.close()
+
+    async def _watch_order_book(self, setting):
+        while True:
+            client = self.exchanges.get(setting["exchange"])
+            if client is None:
+                await asyncio.sleep(0.5)
+                continue
+            break
+        while True:
+            try:
+                start = datetime.now()
+                param = setting["symbols"]
+                match setting["mode"]:
+                    case "single":
+                        await asyncio.sleep(0.5)
+                        order_book = await self._exponential_backoff(
+                            client.fetch_order_book, param[0]
+                        )
+                    case "all":
+                        order_book = await self._exponential_backoff(
+                            client.fetch_order_books
+                        )
+                    case "batch":
+                        order_book = await self._exponential_backoff(
+                            client.watch_order_book_for_symbols, param
+                        )
+                if "asks" in order_book:
+                    self.memcache_client.set(
+                        f"/asks/{order_book['symbol']}/{setting['exchange']}",
+                        order_book["asks"],
+                        expire=self.expire_book_orders,
+                    )
+                if "bids" in order_book:
+                    self.memcache_client.set(
+                        f"/bids/{order_book['symbol']}/{setting['exchange']}",
+                        order_book["bids"],
+                        expire=self.expire_book_orders,
+                    )
+                duration = str(datetime.now() - start)
+                self.logger.debug(
+                    f"Updated {setting['exchange']} in {duration}",
+                    extra={
+                        "exchange": setting["exchange"],
+                        "duration": duration,
+                        "symbol": (
+                            setting["symbols"][0]
+                            if setting["mode"] == "single"
+                            else None
+                        ),
+                    },
+                )
+            except Exception as e:
+                self.logger.exception(e, extra={"exchange": setting["exchange"]})
+            self.logger.debug(
+                f"Closed {setting['exchange']}",
+                extra={"exchange": setting["exchange"]},
+            )
+            await asyncio.sleep(1)
 
     async def run(self, config):
         self.logger.info(f"Dealer started")
         try:
             await self._bot.initialize()
             self.logger.debug(f"Bot initialized")
-            tasks = [self._process_bot_events(), self._init_exchanges(config["dealer"])]
-            for symbol in config["dealer"]["symbols"].keys():
-                tasks += [self._watch_deals(symbol)]
+            
+            tasks = [asyncio.create_task(self._process_bot_events(), name="_process_bot_events")]
+            exchange_ids = list(set([id for id_list in list(config["dealer"]["symbols"].values()) for id in id_list]))
+            tasks += [asyncio.create_task(self._setup_exchange(id), name=f"_setup_exchange_{id}") for id in exchange_ids]
+            tasks += [asyncio.create_task(self._watch_deals(symbol), name=f"_watch_deals_{symbol}") for symbol in config["dealer"]["symbols"].keys()]
+            i = 0
+            for setting in config["updater"]:
+                tasks += [
+                    asyncio.create_task(
+                        self._watch_order_book(setting), name=f"_watch_order_book_{i}"
+                    )
+                ]
+                i += 1
 
             await asyncio.gather(*tasks)
             self.logger.info(f"Dealer exited")
@@ -401,5 +477,60 @@ class Dealer(App):
             return 1
 
     async def close(self):
-        await super().close()
-        await self._bot.close()
+        tasks = [client.close() for client in self.exchanges.values()] + [self._bot.close()]
+        await asyncio.gather(*tasks)
+
+
+    async def _exponential_backoff(self, fn, *args, **kwargs):
+        backoff = [1, 2, 4, 8]
+        last_exception = None
+        for delay in backoff:
+            try:
+                return await fn(*args, **kwargs)
+            except asyncio.CancelledError as e:
+                raise e
+            except Exception as e:
+                await asyncio.sleep(delay)
+                if isinstance(e, CoroutineType):
+                    last_exception = await e
+                else:
+                    last_exception = e
+                self.logger.exception(e)
+        raise last_exception
+
+    async def _setup_exchange(self, exchange_id):
+        api_key = os.getenv(f"{exchange_id.upper()}_API_KEY")
+        secret = os.getenv(f"{exchange_id.upper()}_SECRET")
+        passphrase = os.getenv(f"{exchange_id.upper()}_PASSPHRASE")
+        auth = None
+        if api_key is not None or secret is not None or passphrase is not None:
+            auth = {
+                "apiKey": api_key,
+                "secret": secret,
+                "passphrase": passphrase,
+            }
+        client_cls = getattr(ccxt, exchange_id)
+        if auth is not None:
+            client = client_cls(auth)
+            self.logger.debug(
+                f"{exchange_id} logged in",
+                extra={"exchange": exchange_id},
+            )
+        else:
+            client = client_cls()
+
+        while True:
+            try:
+                await self._exponential_backoff(client.load_markets)
+                self.logger.info(
+                    f"{exchange_id} loaded markets",
+                    extra={"exchange": exchange_id},
+                )
+                break
+            except Exception as e:
+                self.logger.exception(e, extra={"exchange": exchange_id})
+                await client.close()
+                await asyncio.sleep(1)
+
+        self.exchanges[client.id] = client
+        return client

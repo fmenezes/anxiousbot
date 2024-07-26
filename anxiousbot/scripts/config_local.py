@@ -79,9 +79,7 @@ async def _process_exchange(exchange, symbols):
         await client.close()
 
 
-async def _run():
-    symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "GALA/USDT"]
-
+async def _run(symbols):
     exchanges = [
         exchange
         for exchange in ccxt.exchanges
@@ -111,12 +109,13 @@ async def _run():
             symbols_exchanges[symbol] += [entry["exchange"]]
     config = {"dealer": {"symbols": symbols_exchanges}, "updater": results}
     with open(f"./config/local.json", "w") as f:
-        json.dump(config, fp=f, indent=2)
+        json.dumps(config, fp=f, indent=2)
 
 
 def _main():
     load_dotenv(override=True)
-    asyncio.run(_run())
+    symbols = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "GALA/USDT"]
+    asyncio.run(_run(symbols))
 
 
 if __name__ == "__main__":
