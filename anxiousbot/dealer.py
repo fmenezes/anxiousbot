@@ -449,13 +449,16 @@ class Dealer():
             )
             await asyncio.sleep(1)
 
+    async def _watch_balance(self):
+        self.memcache_client.set("/balance/USDT", 100000)
+
     async def run(self, config):
         self.logger.info(f"Dealer started")
         try:
             await self._bot.initialize()
             self.logger.debug(f"Bot initialized")
             
-            tasks = [asyncio.create_task(self._process_bot_events(), name="_process_bot_events")]
+            tasks = [asyncio.create_task(self._process_bot_events(), name="_process_bot_events"), asyncio.create_task(self._watch_balance(), name="_watch_balance")]
             exchange_ids = list(set([id for id_list in list(config["dealer"]["symbols"].values()) for id in id_list]))
             tasks += [asyncio.create_task(self._setup_exchange(id), name=f"_setup_exchange_{id}") for id in exchange_ids]
             tasks += [asyncio.create_task(self._watch_deals(symbol), name=f"_watch_deals_{symbol}") for symbol in config["dealer"]["symbols"].keys()]
