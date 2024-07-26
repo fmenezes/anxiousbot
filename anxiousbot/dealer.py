@@ -334,7 +334,7 @@ class Dealer:
                 icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
                 msg = f"{icon} {event['message']}"
                 await self._exponential_backoff(
-                    self._bot.send_message, chat_id=self._bot_chat_id, text=msg
+                    self._bot.send_message, chat_id=self._bot_chat_id, text=msg, read_timeout=35, write_timeout=35, connect_timeout=35, pool_timeout=35
                 )
             except Exception as e:
                 self.logger.exception(
