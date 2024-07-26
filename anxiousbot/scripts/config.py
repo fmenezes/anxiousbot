@@ -1,7 +1,9 @@
 import asyncio
 import csv
 import json
+import os
 from collections import Counter
+from glob import glob
 
 import ccxt.pro as ccxt
 from dotenv import load_dotenv
@@ -224,6 +226,19 @@ def _split_machines(data, count=None):
     return result
 
 
+def _split_dict(data, count):
+    result = []
+    index = 0
+    for key, value in data.items():
+        if index >= count:
+            index = 0
+        if len(result) <= index:
+            result += [{}]
+        result[index][key] = value
+        index += 1
+    return result
+
+
 async def _run():
     exchanges = [
         exchange
@@ -252,18 +267,22 @@ async def _run():
     data = list(_filter_symbols_in_exchanges(data, filtered_symbols))
     data = _filter_exchanges(data)
     data = list(_split_batches(data))
-    data = _split_machines(data, 45)
+    machine_count = 45
+    data = _split_machines(data, machine_count)
     symbols_exchanges = dict(
         [(entry["symbol"], entry["exchanges"]) for entry in filtered_symbol_list]
     )
-    config = [{"dealer": {"symbols": symbols_exchanges}}] + [
-        {"updater": entry} for entry in data
-    ]
-    index = 0
-    for entry in config:
-        with open(f"./config/config-{index}.json", "w") as f:
-            json.dump(entry, fp=f, indent=2)
-        index += 1
+    symbols_exchanges = _split_dict(symbols_exchanges, machine_count)
+    data = [{"dealer": {"symbols": {}}, "updater": entry} for entry in data]
+    for i in range(len(symbols_exchanges)):
+        data[i]["dealer"]["symbols"] = symbols_exchanges[i]
+
+    for filename in glob("./config/config-*.json"):
+        os.remove(filename)
+
+    for i in range(len(data)):
+        with open(f"./config/config-{i}.json", "w") as f:
+            json.dump(data[i], fp=f, indent=2)
 
 
 def _main():

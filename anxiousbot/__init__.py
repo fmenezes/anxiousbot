@@ -1,9 +1,9 @@
 import asyncio
 import logging
 import os
+import traceback
 from contextlib import asynccontextmanager
 from types import CoroutineType
-import traceback
 
 import boto3
 import ccxt.pro as ccxt
@@ -58,12 +58,16 @@ def _log_record_factory(log_factory=None, extra=None):
 
         if isinstance(record.exc_info, BaseException):
             try:
-                record.exc_formatted = ''.join(traceback.format_exception(record.exc_info))
+                record.exc_formatted = "".join(
+                    traceback.format_exception(record.exc_info)
+                )
             except:
                 pass
         if isinstance(record.exc_info, tuple):
             try:
-                record.exc_formatted = ''.join(traceback.format_exception(record.exc_info[1]))
+                record.exc_formatted = "".join(
+                    traceback.format_exception(record.exc_info[1])
+                )
             except:
                 pass
 

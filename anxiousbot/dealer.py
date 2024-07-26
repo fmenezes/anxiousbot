@@ -8,6 +8,8 @@ from telegram import Bot
 
 from anxiousbot import App, split_coin
 
+DEFAULT_EXIPRE_DEAL_EVENT = 60
+
 
 class Deal:
     def __init__(self, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids):
@@ -283,7 +285,7 @@ class Dealer(App):
         self.memcache_client.set(
             f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
             new_event,
-            expire=60,
+            expire=DEFAULT_EXIPRE_DEAL_EVENT,
         )
 
         if new_event["type"] != "noop":
