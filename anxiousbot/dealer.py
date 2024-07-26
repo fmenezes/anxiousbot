@@ -317,7 +317,7 @@ class Dealer(App):
                 )
                 await asyncio.sleep(0.5)
 
-    async def _watch_deals(self, symbol, client_ids):
+    async def _watch_deals(self, symbol):
         while True:
             try:
                 start = datetime.now()
@@ -332,7 +332,7 @@ class Dealer(App):
 
                 tasks = []
                 for buy_client_id, sell_client_id in [
-                    (a, b) for a in client_ids for b in client_ids if a != b
+                    (a, b) for a in self.exchanges.keys() for b in self.exchanges.keys() if a != b
                 ]:
                     asks = self.memcache_client.get(f"/asks/{symbol}/{buy_client_id}")
                     if asks is None or len(asks) == 0:
@@ -362,16 +362,19 @@ class Dealer(App):
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
                 )
 
+    async def _init_exchange(self, id):
+        self.exchanges[id] = await self.setup_exchange(id)
+
     async def _init_exchanges(self, config):
         all_exchanges = []
         for symbol, exchanges in config["symbols"].items():
             all_exchanges += exchanges
         all_exchanges = list(set(all_exchanges))
         tasks = []
+        self.exchanges = {}
         for exchange_id in all_exchanges:
-            tasks += [self.setup_exchange(exchange_id)]
-        results = await asyncio.gather(*tasks)
-        self.exchanges = dict([(entry.id, entry) for entry in results])
+            tasks += [self._init_exchange(exchange_id)]
+        await asyncio.gather(*tasks)
 
     async def close_exchange(self, client):
         del self.exchanges[client.id]
@@ -382,11 +385,9 @@ class Dealer(App):
         try:
             await self._bot.initialize()
             self.logger.debug(f"Bot initialized")
-            await self._init_exchanges(config["dealer"])
-
-            tasks = [self._process_bot_events()]
-            for symbol, exchanges in config["dealer"]["symbols"].items():
-                tasks += [self._watch_deals(symbol, exchanges)]
+            tasks = [self._process_bot_events(), self._init_exchanges(config["dealer"])]
+            for symbol in config["dealer"]["symbols"].keys():
+                tasks += [self._watch_deals(symbol)]
 
             await asyncio.gather(*tasks)
             self.logger.info(f"Dealer exited")
