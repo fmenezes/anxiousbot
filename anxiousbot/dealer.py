@@ -568,7 +568,6 @@ class Dealer:
                     last_exception = await e
                 else:
                     last_exception = e
-                self.logger.exception(e)
         raise last_exception
 
     async def _setup_exchange(self, exchange_id):
