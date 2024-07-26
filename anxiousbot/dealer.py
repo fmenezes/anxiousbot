@@ -362,10 +362,20 @@ class Dealer:
                     for b in self.exchanges.keys()
                     if a != b
                 ]:
-                    asks = self.memcache_client.get(f"/asks/{symbol}/{buy_client_id}")
+                    buy_order_book = self.memcache_client.get(
+                        f"/order_book/{symbol}/{buy_client_id}"
+                    )
+                    if buy_order_book is None:
+                        continue
+                    asks = buy_order_book.get("asks")
                     if asks is None or len(asks) == 0:
                         continue
-                    bids = self.memcache_client.get(f"/bids/{symbol}/{sell_client_id}")
+                    sell_order_book = self.memcache_client.get(
+                        f"/order_book/{symbol}/{sell_client_id}"
+                    )
+                    if sell_order_book is None:
+                        continue
+                    bids = sell_order_book.get("bids")
                     if bids is None or len(bids) == 0:
                         continue
                     deal = Deal(
@@ -421,18 +431,11 @@ class Dealer:
                         )
 
                 def update_order_book(order_book, symbol):
-                    if "asks" in order_book:
-                        self.memcache_client.set(
-                            f"/asks/{symbol}/{setting['exchange']}",
-                            order_book["asks"],
-                            expire=self.expire_book_orders,
-                        )
-                    if "bids" in order_book:
-                        self.memcache_client.set(
-                            f"/bids/{symbol}/{setting['exchange']}",
-                            order_book["bids"],
-                            expire=self.expire_book_orders,
-                        )
+                    self.memcache_client.set(
+                        f"/order_book/{symbol}/{setting['exchange']}",
+                        order_book,
+                        expire=self.expire_book_orders,
+                    )
                     duration = str(datetime.now() - start)
                     self.logger.debug(
                         f"Updated {setting['exchange']} in {duration}",
@@ -451,10 +454,6 @@ class Dealer:
                     update_order_book(order_book, order_book["symbol"])
             except Exception as e:
                 self.logger.exception(e, extra={"exchange": setting["exchange"]})
-            self.logger.debug(
-                f"Closed {setting['exchange']}",
-                extra={"exchange": setting["exchange"]},
-            )
             await asyncio.sleep(1)
 
     async def _watch_balance(self):
