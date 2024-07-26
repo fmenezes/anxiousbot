@@ -332,7 +332,10 @@ class Dealer(App):
 
                 tasks = []
                 for buy_client_id, sell_client_id in [
-                    (a, b) for a in self.exchanges.keys() for b in self.exchanges.keys() if a != b
+                    (a, b)
+                    for a in self.exchanges.keys()
+                    for b in self.exchanges.keys()
+                    if a != b
                 ]:
                     asks = self.memcache_client.get(f"/asks/{symbol}/{buy_client_id}")
                     if asks is None or len(asks) == 0:
