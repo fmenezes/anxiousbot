@@ -16,22 +16,22 @@ class Runner:
         self.cache_endpoint = cache_endpoint
         self.bot_token = bot_token
         self.bot_chat_id = bot_chat_id
-        self.logger = get_logger(name=__name__, extra={"config": self.config_path})
-        self.memcache_client = MemcacheClient(
-            self.cache_endpoint, serde=serde.pickle_serde
-        )
 
     async def run(self):
+        logger = get_logger(name=__name__, extra={"config": self.config_path})
+        memcache_client = MemcacheClient(
+            self.cache_endpoint, serde=serde.pickle_serde
+        )
         def _sys_excepthook(exc_type, exc_value, exc_traceback):
             if issubclass(exc_type, KeyboardInterrupt):
                 sys.__excepthook__(exc_type, exc_value, exc_traceback)
                 return
-            self.logger.exception(
+            logger.exception(
                 "Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback)
             )
 
         def _thread_excepthook(exc_type, exc_value, exc_traceback, thread):
-            self.logger.exception(
+            logger.exception(
                 f"Uncaught exception in thread {thread}",
                 exc_info=(exc_type, exc_value, exc_traceback),
             )
@@ -44,8 +44,8 @@ class Runner:
 
         async with closing(
             Dealer(
-                memcache_client=self.memcache_client,
-                logger=self.logger,
+                memcache_client=memcache_client,
+                logger=logger,
                 bot_token=self.bot_token,
                 bot_chat_id=self.bot_chat_id,
             )

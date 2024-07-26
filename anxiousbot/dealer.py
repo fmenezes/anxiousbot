@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import json
 import csv
 import os
 from datetime import datetime
@@ -207,6 +208,7 @@ class Dealer:
         self._bot = Bot(self._bot_token)
         self.expire_book_orders = expire_book_orders
         self.expire_deal_events = expire_deal_events
+        self.initialized = False
         self.exchanges = {}
         if logger is None:
             logger = get_logger()
@@ -417,31 +419,33 @@ class Dealer:
                         order_book = await self._exponential_backoff(
                             client.watch_order_book_for_symbols, param
                         )
-                if "asks" in order_book:
-                    self.memcache_client.set(
-                        f"/asks/{order_book['symbol']}/{setting['exchange']}",
-                        order_book["asks"],
-                        expire=self.expire_book_orders,
+                def update_order_book(order_book, symbol):
+                    if "asks" in order_book:
+                        self.memcache_client.set(
+                            f"/asks/{order_book['symbol']}/{setting['exchange']}",
+                            order_book["asks"],
+                            expire=self.expire_book_orders,
+                        )
+                    if "bids" in order_book:
+                        self.memcache_client.set(
+                            f"/bids/{order_book['symbol']}/{setting['exchange']}",
+                            order_book["bids"],
+                            expire=self.expire_book_orders,
+                        )
+                    duration = str(datetime.now() - start)
+                    self.logger.debug(
+                        f"Updated {setting['exchange']} in {duration}",
+                        extra={
+                            "exchange": setting["exchange"],
+                            "duration": duration,
+                            "symbol": symbol
+                        },
                     )
-                if "bids" in order_book:
-                    self.memcache_client.set(
-                        f"/bids/{order_book['symbol']}/{setting['exchange']}",
-                        order_book["bids"],
-                        expire=self.expire_book_orders,
-                    )
-                duration = str(datetime.now() - start)
-                self.logger.debug(
-                    f"Updated {setting['exchange']} in {duration}",
-                    extra={
-                        "exchange": setting["exchange"],
-                        "duration": duration,
-                        "symbol": (
-                            setting["symbols"][0]
-                            if setting["mode"] == "single"
-                            else None
-                        ),
-                    },
-                )
+                if setting["mode"] == "all" or setting["mode"] == "batch":
+                    for symbol, order in order_book.items():
+                        update_order_book(order, symbol)
+                else:
+                    update_order_book(order_book, order_book['symbol'])
             except Exception as e:
                 self.logger.exception(e, extra={"exchange": setting["exchange"]})
             self.logger.debug(
@@ -453,10 +457,42 @@ class Dealer:
     async def _watch_balance(self):
         self.memcache_client.set("/balance/USDT", 100000)
 
+    async def initialize(self):
+        if self.initialized == True:
+            return
+        await self._bot.initialize()
+
+        with open('./config/exchanges.json', 'r') as f:
+            self.exchanges_param = json.load(f)
+
+        with open('./config/symbols.json', 'r') as f:
+            self.symbols_param = json.load(f)
+
+        self.initialized = True
+
+    def _exchange_ids(self, symbols):
+        return list(set([exchange for symbol in symbols for exchange in self.symbols_param[symbol]["exchanges"]]))
+
+    def _update_settings(self, symbols):
+        ids = self._exchange_ids(symbols)
+        settings = [{**self.exchanges_param[id], "symbols": [symbol for symbol in self.exchanges_param[id]["symbols"] if symbol in symbols]} for id in ids]
+        settings = [entry for entry in settings if len(entry["symbols"]) > 0]
+        for setting in settings:
+            match setting["mode"]:
+                case "all":
+                    yield setting
+                case "batch":
+                    yield setting
+                case "single":
+                    for symbol in setting["symbols"]:
+                        yield {**setting, "symbols": [symbol]}
+
+
     async def run(self, config):
         self.logger.info(f"Dealer started")
+        symbols = config["symbols"]
         try:
-            await self._bot.initialize()
+            await self.initialize()
             self.logger.debug(f"Bot initialized")
 
             tasks = [
@@ -465,35 +501,27 @@ class Dealer:
                 ),
                 asyncio.create_task(self._watch_balance(), name="_watch_balance"),
             ]
-            exchange_ids = list(
-                set(
-                    [
-                        id
-                        for id_list in list(config["dealer"]["symbols"].values())
-                        for id in id_list
-                    ]
-                )
-            )
             tasks += [
                 asyncio.create_task(
                     self._setup_exchange(id), name=f"_setup_exchange_{id}"
                 )
-                for id in exchange_ids
+                for id in self._exchange_ids(symbols)
             ]
             tasks += [
                 asyncio.create_task(
                     self._watch_deals(symbol), name=f"_watch_deals_{symbol}"
                 )
-                for symbol in config["dealer"]["symbols"].keys()
+                for symbol in symbols
             ]
-            i = 0
-            for setting in config["updater"]:
+            for setting in self._update_settings(symbols):
+                task_name = f"_watch_order_book_{setting['exchange']}"
+                if setting["mode"] == "single":
+                    task_name += f"_{setting['symbols'][0]}"
                 tasks += [
                     asyncio.create_task(
-                        self._watch_order_book(setting), name=f"_watch_order_book_{i}"
+                        self._watch_order_book(setting), name=task_name
                     )
                 ]
-                i += 1
 
             await asyncio.gather(*tasks)
             self.logger.info(f"Dealer exited")
