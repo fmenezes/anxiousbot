@@ -45,6 +45,12 @@
         state: directory
         mode: '0755'
 
+    - name: Create log directory
+      file:
+        path: /var/log/anxiousbot
+        state: directory
+        mode: '0755'
+
     - name: Create CloudWatch Agent configuration file
       copy:
         dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
