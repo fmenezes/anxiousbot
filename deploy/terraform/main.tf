@@ -217,7 +217,7 @@ resource "aws_elasticache_subnet_group" "cache_subnet_group" {
 # Memcached cluster
 resource "aws_elasticache_cluster" "cache_cluster" {
   cluster_id           = "anxiousbot-memcached-cluster"
-  engine               = "memcached"
+  engine               = "redis"
   node_type            = "cache.t2.small"
   num_cache_nodes      = 1
   security_group_ids   = [aws_security_group.cache_sg.id]

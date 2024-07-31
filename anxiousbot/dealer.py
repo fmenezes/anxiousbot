@@ -8,8 +8,7 @@ from types import CoroutineType
 
 import ccxt.pro as ccxt
 from ccxt.base.errors import RateLimitExceeded
-from pymemcache.client.base import Client as MemcacheClient
-from pymemcache.serde import pickle_serde
+from redis.asyncio import Redis
 from telegram import Bot
 from telegram.error import RetryAfter
 
@@ -18,7 +17,7 @@ from anxiousbot import get_logger, split_coin
 DEFAULT_EXIPRE_DEAL_EVENTS = 60
 DEFAULT_EXPIRE_BOOK_ORDERS = 60
 DEFAULT_CONFIG_PATH = "./config/local.json"
-DEFAULT_CACHE_ENDPOINT = "localhost"
+DEFAULT_CACHE_ENDPOINT = "redis://localhost"
 
 
 class Deal:
@@ -227,7 +226,7 @@ class Dealer:
         self._initialized = False
         self._exchanges = {}
         self._logger = get_logger(__name__, extra={"config": self._config_path})
-        self._memcache_client = MemcacheClient(cache_endpoint, serde=pickle_serde)
+        self._redis_client = Redis.from_url(cache_endpoint)
 
     def _write_deal_xml(self, deal_event):
         if deal_event["type"] != "close":
@@ -273,9 +272,11 @@ class Dealer:
             w.writerow(row)
 
     async def _process_deal(self, deal):
-        current_event = self._memcache_client.get(
-            f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
-            {"ts_open": str(datetime.now()), "type": "noop", "threshold": False},
+        current_event = json.loads(
+            await self._redis_client.get(
+                f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}"
+            )
+            or f'{{"ts_open": "{datetime.now()}", "type": "noop", "threshold": false}}'
         )
         new_event = deal.to_dict()
 
@@ -312,10 +313,10 @@ class Dealer:
                 f"Deal {event_type}, making a {gain_type} of {new_event['profit']} {quote_coin} ({new_event['profit_percentage']}%), at {new_event['buy_exchange']} convert {new_event['buy_total_quote']} {quote_coin} to {new_event['buy_total_base']} {base_coin}, transfer to {new_event['sell_exchange']} and finally sell back to {quote_coin} for {new_event['sell_total_quote']}, took {new_event['duration']}"
             )
 
-        self._memcache_client.set(
+        await self._redis_client.set(
             f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
-            new_event,
-            expire=self._expire_deal_events,
+            json.dumps(new_event),
+            ex=self._expire_deal_events,
         )
 
         if new_event["type"] != "noop":
@@ -372,9 +373,11 @@ class Dealer:
                 )
                 base_coin, quote_coin = symbol.split("/")
                 balance = {
-                    base_coin: self._memcache_client.get(f"/balance/{base_coin}", 0.0),
-                    quote_coin: self._memcache_client.get(
-                        f"/balance/{quote_coin}", 0.0
+                    base_coin: json.loads(
+                        await self._redis_client.get(f"/balance/{base_coin}") or "0.0"
+                    ),
+                    quote_coin: json.loads(
+                        await self._redis_client.get(f"/balance/{quote_coin}") or "0.0"
                     ),
                 }
 
@@ -385,19 +388,21 @@ class Dealer:
                     for b in self._exchanges.keys()
                     if a != b
                 ]:
-                    buy_order_book = self._memcache_client.get(
+                    buy_order_book = await self._redis_client.get(
                         f"/order_book/{symbol}/{buy_client_id}"
                     )
                     if buy_order_book is None:
                         continue
+                    buy_order_book = json.loads(buy_order_book)
                     asks = buy_order_book.get("asks")
                     if asks is None or len(asks) == 0:
                         continue
-                    sell_order_book = self._memcache_client.get(
+                    sell_order_book = await self._redis_client.get(
                         f"/order_book/{symbol}/{sell_client_id}"
                     )
                     if sell_order_book is None:
                         continue
+                    sell_order_book = json.loads(sell_order_book)
                     bids = sell_order_book.get("bids")
                     if bids is None or len(bids) == 0:
                         continue
@@ -453,11 +458,11 @@ class Dealer:
                             client.watch_order_book_for_symbols, param
                         )
 
-                def update_order_book(order_book, symbol):
-                    self._memcache_client.set(
+                async def update_order_book(order_book, symbol):
+                    await self._redis_client.set(
                         f"/order_book/{symbol}/{setting['exchange']}",
-                        order_book,
-                        expire=self._expire_book_orders,
+                        json.dumps(order_book),
+                        ex=self._expire_book_orders,
                     )
                     duration = str(datetime.now() - start)
                     self._logger.debug(
@@ -472,15 +477,15 @@ class Dealer:
                 if setting["mode"] == "all" or setting["mode"] == "batch":
                     for symbol, order in order_book.items():
                         if symbol in self.config["symbols"]:
-                            update_order_book(order, symbol)
+                            await update_order_book(order, symbol)
                 else:
-                    update_order_book(order_book, order_book["symbol"])
+                    await update_order_book(order_book, order_book["symbol"])
             except Exception as e:
                 self._logger.exception(e, extra={"exchange": setting["exchange"]})
             await asyncio.sleep(1)
 
     async def _watch_balance(self):
-        self._memcache_client.set("/balance/USDT", 100000)
+        await self._redis_client.set("/balance/USDT", "100000")
 
     async def initialize(self):
         if self._initialized == True:
