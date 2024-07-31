@@ -8,8 +8,8 @@ from types import CoroutineType
 
 import ccxt.pro as ccxt
 from ccxt.base.errors import RateLimitExceeded
-from pymemcache.serde import pickle_serde
 from pymemcache.client.base import Client as MemcacheClient
+from pymemcache.serde import pickle_serde
 from telegram import Bot
 from telegram.error import RetryAfter
 
@@ -373,7 +373,9 @@ class Dealer:
                 base_coin, quote_coin = symbol.split("/")
                 balance = {
                     base_coin: self._memcache_client.get(f"/balance/{base_coin}", 0.0),
-                    quote_coin: self._memcache_client.get(f"/balance/{quote_coin}", 0.0),
+                    quote_coin: self._memcache_client.get(
+                        f"/balance/{quote_coin}", 0.0
+                    ),
                 }
 
                 tasks = []
@@ -597,20 +599,43 @@ class Dealer:
                     last_exception = e
         raise last_exception
 
+    def _credentials(self, exchange_id):
+        auth_keys = [
+            "apiKey",
+            "secret",
+            "uid",
+            "accountId",
+            "login",
+            "password",
+            "twofa",
+            "privateKey",
+            "walletAddress",
+            "token",
+        ]
+        auth = dict(
+            [
+                (key, os.getenv(f"{exchange_id.upper()}_{key.upper()}"))
+                for key in auth_keys
+            ]
+        )
+        auth = dict(
+            [
+                (key, value.replace("\\n", "\n"))
+                for key, value in auth.items()
+                if value is not None
+            ]
+        )
+
+        if len(auth.keys()) == 0:
+            return None
+
+        return auth
+
     async def _setup_exchange(self, exchange_id):
         if exchange_id in self._exchanges:
             return self._exchanges[exchange_id]
 
-        api_key = os.getenv(f"{exchange_id.upper()}_API_KEY")
-        secret = os.getenv(f"{exchange_id.upper()}_SECRET")
-        passphrase = os.getenv(f"{exchange_id.upper()}_PASSPHRASE")
-        auth = None
-        if api_key is not None or secret is not None or passphrase is not None:
-            auth = {
-                "apiKey": api_key,
-                "secret": secret,
-                "passphrase": passphrase,
-            }
+        auth = self._credentials(exchange_id)
         client_cls = getattr(ccxt, exchange_id)
         if auth is not None:
             client = client_cls(auth)

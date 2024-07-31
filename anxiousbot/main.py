@@ -12,7 +12,7 @@ from anxiousbot.dealer import Dealer
 async def _main():
     load_dotenv(override=True)
     CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/local.json")
-    CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT", "localhost")
+    CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT")
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     BOT_CHAT_ID = os.getenv("BOT_CHAT_ID")
     logger = get_logger(name=__name__, extra={"config": CONFIG_PATH})
