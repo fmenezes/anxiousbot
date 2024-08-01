@@ -201,7 +201,7 @@ resource "aws_security_group" "cache_sg" {
   }
 }
 
-# Memcached subnet
+# Cache subnet
 resource "aws_elasticache_subnet_group" "cache_subnet_group" {
   name       = "anxiousbot-cache-subnet-group"
   subnet_ids = [aws_subnet.main.id]
@@ -212,9 +212,9 @@ resource "aws_elasticache_subnet_group" "cache_subnet_group" {
   }
 }
 
-# Memcached cluster
+# Cache cluster
 resource "aws_elasticache_cluster" "cache_cluster" {
-  cluster_id           = "anxiousbot-memcached-cluster"
+  cluster_id           = "anxiousbot-cache-cluster"
   engine               = "redis"
   node_type            = "cache.t2.small"
   num_cache_nodes      = 1
@@ -222,7 +222,7 @@ resource "aws_elasticache_cluster" "cache_cluster" {
   subnet_group_name    = aws_elasticache_subnet_group.cache_subnet_group.name
 
   tags = {
-    Name    = "anxiousbot-memcached-cluster"
+    Name    = "anxiousbot-cache-cluster"
     Project = "anxiousbot"
   }
 }
@@ -255,6 +255,11 @@ data "external" "count_config_files" {
   program = ["bash", "count_config_files.sh"]
 }
 
+resource "aws_key_pair" "anxiousbot_key" {
+  key_name   = "anxiousbot-key"
+  public_key = file("~/.ssh/anxiousbot_key.pub")
+}
+
 # EC2 Instance
 resource "aws_instance" "server" {
   count                       = data.external.count_config_files.result.files
@@ -263,7 +268,7 @@ resource "aws_instance" "server" {
   subnet_id                   = aws_subnet.main.id
   vpc_security_group_ids      = [aws_security_group.allow_ssh.id]
   associate_public_ip_address = true
-  key_name                    = "filipe"
+  key_name                    = aws_key_pair.anxiousbot_key.key_name
   iam_instance_profile        = aws_iam_instance_profile.ec2_instance_profile.name
 
   user_data = <<-EOF

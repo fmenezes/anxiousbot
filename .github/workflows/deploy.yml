@@ -26,6 +26,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - run: mkdir -p  $HOME/.ssh && echo "$SSH_PRIVATE_KEY" > $HOME/.ssh/anxiousbot_key.pub && sudo chmod 400 $HOME/.ssh/anxiousbot_key.pub
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+
       - run: terraform init
 
       - run: terraform apply -auto-approve
@@ -57,7 +61,7 @@ jobs:
         env:
           VAULT_PASS: ${{ secrets.VAULT_PASS }}
 
-      - run: mkdir -p  $HOME/.ssh && echo "$SSH_PRIVATE_KEY" > $HOME/.ssh/filipe.pem && sudo chmod 400 $HOME/.ssh/filipe.pem
+      - run: mkdir -p  $HOME/.ssh && echo "$SSH_PRIVATE_KEY" > $HOME/.ssh/anxiousbot_key && sudo chmod 400 $HOME/.ssh/anxiousbot_key
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
