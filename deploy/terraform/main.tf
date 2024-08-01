@@ -213,11 +213,12 @@ resource "aws_elasticache_subnet_group" "cache_subnet_group" {
 }
 
 # Cache cluster
-resource "aws_elasticache_cluster" "cache_cluster" {
-  cluster_id           = "anxiousbot-cache-cluster"
-  engine               = "redis"
+resource "aws_elasticache_replication_group" "cache_cluster_group" {
+  automatic_failover_enabled  = false
+  description = "Anxiousbot redis cluster"
+  replication_group_id = "anxiousbot-cache-cluster"
   node_type            = "cache.t2.small"
-  num_cache_nodes      = 1
+  num_cache_clusters      = 1
   security_group_ids   = [aws_security_group.cache_sg.id]
   subnet_group_name    = aws_elasticache_subnet_group.cache_subnet_group.name
 
@@ -276,7 +277,7 @@ resource "aws_instance" "server" {
     mkdir -p /etc/anxiousbot
     echo 'S3BUCKET="${data.aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
     echo 'CONFIG_PATH="config/config-${count.index}.json"' >> /etc/anxiousbot/.env
-    echo 'CACHE_ENDPOINT="${aws_elasticache_cluster.cache_cluster.configuration_endpoint}"' >> /etc/anxiousbot/.env
+    echo 'CACHE_ENDPOINT="redis://${aws_elasticache_replication_group.cache_cluster_group.primary_endpoint_address}:${aws_elasticache_replication_group.cache_cluster_group.port == null ? 6379 : aws_elasticache_replication_group.cache_cluster_group.port}"' >> /etc/anxiousbot/.env
   EOF
 
   tags = {
