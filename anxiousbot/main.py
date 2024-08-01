@@ -12,6 +12,7 @@ from anxiousbot.dealer import Dealer
 async def _main():
     load_dotenv(override=True)
     CONFIG_PATH = os.getenv("CONFIG_PATH", "./config/local.json")
+    RUN_BOT = os.getenv("RUN_BOT")
     CACHE_ENDPOINT = os.getenv("CACHE_ENDPOINT")
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     BOT_CHAT_ID = os.getenv("BOT_CHAT_ID")
@@ -34,12 +35,14 @@ async def _main():
     threading.excepthook = _thread_excepthook
     sys.excepthook = _sys_excepthook
 
+    run_bot_updates = (RUN_BOT or "1").lower() in ["1", "true", "yes", "t", "y"]
     async with closing(
         Dealer(
             cache_endpoint=CACHE_ENDPOINT,
             bot_token=BOT_TOKEN,
             bot_chat_id=BOT_CHAT_ID,
             config_path=CONFIG_PATH,
+            run_bot_updates=run_bot_updates,
         )
     ) as service:
         return await service.run()

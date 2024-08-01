@@ -9,7 +9,7 @@ from types import CoroutineType
 import ccxt.pro as ccxt
 from ccxt.base.errors import RateLimitExceeded
 from redis.asyncio import Redis
-from telegram import Bot
+from telegram import Bot, Update
 from telegram.error import RetryAfter
 
 from anxiousbot import get_logger, split_coin
@@ -202,6 +202,7 @@ class Dealer:
         expire_deal_events=None,
         cache_endpoint=None,
         config_path=None,
+        run_bot_updates=None,
     ):
         if config_path is None:
             config_path = DEFAULT_CONFIG_PATH
@@ -215,14 +216,21 @@ class Dealer:
         if expire_deal_events is None:
             expire_deal_events = DEFAULT_EXIPRE_DEAL_EVENTS
 
+        if run_bot_updates is None:
+            run_bot_updates = True
+
+        self._run_bot_updates = run_bot_updates
         self._bot_token = bot_token
         self._bot_chat_id = bot_chat_id
-        self._bot_events = []
-        self._bot_event_lock = asyncio.Lock()
-        self._bot = Bot(self._bot_token)
         self._config_path = config_path
         self._expire_book_orders = expire_book_orders
         self._expire_deal_events = expire_deal_events
+        self._cache_endpoint = cache_endpoint
+
+        self._auth_exchanges = []
+        self._bot_events = []
+        self._bot_event_lock = asyncio.Lock()
+        self._bot = Bot(self._bot_token)
         self._initialized = False
         self._exchanges = {}
         self._logger = get_logger(__name__, extra={"config": self._config_path})
@@ -327,22 +335,6 @@ class Dealer:
             async with self._bot_event_lock:
                 self._bot_events += [new_event]
 
-    async def _send_message(self, event):
-        icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
-        msg = f"{icon} {event['message']}"
-        try:
-            await self._bot.send_message(
-                chat_id=self._bot_chat_id,
-                text=msg,
-                read_timeout=35,
-                write_timeout=35,
-                connect_timeout=35,
-                pool_timeout=35,
-            )
-        except RetryAfter as e:
-            await asyncio.sleep(e.retry_after)
-            raise e
-
     async def _process_bot_events(self):
         while True:
             try:
@@ -357,7 +349,16 @@ class Dealer:
                     continue
                 if event["type"] not in ["close"]:
                     continue
-                await self._exponential_backoff(self._send_message, event)
+                icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
+                msg = f"{icon} {event['message']}"
+                await self._exponential_backoff(self._bot.send_message,
+                    chat_id=self._bot_chat_id,
+                    text=msg,
+                    read_timeout=35,
+                    write_timeout=35,
+                    connect_timeout=35,
+                    pool_timeout=35,
+                )
             except Exception as e:
                 self._logger.exception(
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
@@ -487,10 +488,13 @@ class Dealer:
     async def _watch_balance(self):
         await self._redis_client.set("/balance/USDT", "100000")
 
-    async def initialize(self):
+    async def _initialize(self):
         if self._initialized == True:
             return
         await self._bot.initialize()
+        await self._bot.set_my_commands([("balance", "fetch balance")])
+        await self._bot.set_my_short_description("anxiousbot trading without patience")
+        await self._bot.set_my_description("anxiousbot trading without patience")
 
         with open(self._config_path, "r") as f:
             self.config = json.load(f)
@@ -538,10 +542,57 @@ class Dealer:
                     for symbol in setting["symbols"]:
                         yield {**setting, "symbols": [symbol]}
 
+    async def fetch_balance(self, update):
+        msg = ''
+        for exchange_id in self._auth_exchanges:
+            if exchange_id not in self._exchanges:
+                msg += f"{exchange_id}: Not initialized\n"
+                continue
+            try:
+                balance = await self._exchanges[exchange_id].fetch_balance()
+                msg += f"{exchange_id}: OK\n"
+                for symbol, value in balance.get('free').items():
+                    if value > 0:
+                        msg += f"  {symbol} {value:.8f}\n"
+            except Exception as e:
+                msg += f"{exchange_id}: error {e}\n"
+
+        await self._exponential_backoff(self._bot.send_message,
+                chat_id=update.effective_message.chat_id,
+                text=msg,
+                read_timeout=35,
+                write_timeout=35,
+                connect_timeout=35,
+                pool_timeout=35,
+            )
+
+    async def _listen_bot_updates(self):
+        _last_update_id = await self._redis_client.get("/bot/last_update_id")
+        if _last_update_id is not None:
+            try:
+                _last_update_id = int(_last_update_id)
+            except:
+                pass
+
+        while True:
+            try:
+                updates = await self._bot.get_updates(offset=_last_update_id, timeout=10, allowed_updates=Update.MESSAGE)
+                for update in updates:
+                    if _last_update_id is not None and update.update_id <= _last_update_id:
+                        continue
+                    if update.message and update.message.text:
+                        match update.message.text:
+                            case "/balance":
+                                await self.fetch_balance(update)
+                    _last_update_id = update.update_id
+                    await self._redis_client.set("/bot/last_update_id", str(_last_update_id))
+            except Exception as e:
+                self._logger.exception(f"An error occurred while processing bot updates: [{type(e).__name__}] {str(e)}")
+
     async def run(self):
         self._logger.info(f"Dealer started")
         try:
-            await self.initialize()
+            await self._initialize()
             self._logger.debug(f"Bot initialized")
             symbols = self.config["symbols"]
 
@@ -551,6 +602,8 @@ class Dealer:
                 ),
                 asyncio.create_task(self._watch_balance(), name="_watch_balance"),
             ]
+            if self._run_bot_updates:
+                tasks += [asyncio.create_task(self._listen_bot_updates(), name="_listen_bot_updates")]
             tasks += [
                 asyncio.create_task(
                     self._setup_exchange(id), name=f"_setup_exchange_{id}"
@@ -581,7 +634,7 @@ class Dealer:
 
     async def close(self):
         tasks = [client.close() for client in self._exchanges.values()] + [
-            self._bot.close()
+            self._bot.shutdown()
         ]
         await asyncio.gather(*tasks)
 
@@ -595,6 +648,9 @@ class Dealer:
                 raise e
             except RateLimitExceeded as e:
                 await asyncio.sleep(60)
+                last_exception = e
+            except RetryAfter as e:
+                await asyncio.sleep(e.retry_after)
                 last_exception = e
             except Exception as e:
                 await asyncio.sleep(delay)
@@ -644,6 +700,7 @@ class Dealer:
         client_cls = getattr(ccxt, exchange_id)
         if auth is not None:
             client = client_cls(auth)
+            self._auth_exchanges += [client.id]
             self._logger.debug(
                 f"{exchange_id} logged in",
                 extra={"exchange": exchange_id},
