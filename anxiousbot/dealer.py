@@ -4,7 +4,6 @@ import json
 import os
 from datetime import datetime
 
-from redis.asyncio import Redis
 from telegram import Bot, Update
 
 from anxiousbot import exponential_backoff, split_coin
@@ -12,6 +11,7 @@ from anxiousbot.config import ConfigHandler
 from anxiousbot.deal import Deal
 from anxiousbot.exchange import ExchangeHandler
 from anxiousbot.log import get_logger
+from anxiousbot.redis_handler import RedisHandler
 
 
 class Dealer:
@@ -20,13 +20,13 @@ class Dealer:
     ):
         self._config_handler = ConfigHandler()
         self._exchange_handler = ExchangeHandler()
+        self._redis_handler = RedisHandler()
 
         self._bot_events = []
         self._bot_event_lock = asyncio.Lock()
         self._bot = Bot(self._config_handler.bot_token)
         self._initialized = False
         self._logger = get_logger(__name__)
-        self._redis_client = Redis.from_url(self._config_handler.cache_endpoint)
 
     def _write_deal_xml(self, deal_event):
         if deal_event["type"] != "close":
@@ -72,11 +72,8 @@ class Dealer:
             w.writerow(row)
 
     async def _process_deal(self, deal):
-        current_event = json.loads(
-            await self._redis_client.get(
-                f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}"
-            )
-            or f'{{"ts_open": "{datetime.now()}", "type": "noop", "threshold": false}}'
+        current_event = await self._redis_handler.get_deal(
+            deal.symbol, deal.buy_exchange.id, deal.sell_exchange.id
         )
         new_event = deal.to_dict()
 
@@ -113,10 +110,8 @@ class Dealer:
                 f"Deal {event_type}, making a {gain_type} of {new_event['profit']} {quote_coin} ({new_event['profit_percentage']}%), at {new_event['buy_exchange']} convert {new_event['buy_total_quote']} {quote_coin} to {new_event['buy_total_base']} {base_coin}, transfer to {new_event['sell_exchange']} and finally sell back to {quote_coin} for {new_event['sell_total_quote']}, took {new_event['duration']}"
             )
 
-        await self._redis_client.set(
-            f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
-            json.dumps(new_event),
-            ex=self._config_handler.expire_deal_events,
+        await self._redis_handler.set_deal(
+            deal.symbol, deal.buy_exchange.id, deal.sell_exchange.id, new_event
         )
 
         if new_event["type"] != "noop":
@@ -167,12 +162,8 @@ class Dealer:
                 )
                 base_coin, quote_coin = symbol.split("/")
                 balance = {
-                    base_coin: json.loads(
-                        await self._redis_client.get(f"/balance/{base_coin}") or "0.0"
-                    ),
-                    quote_coin: json.loads(
-                        await self._redis_client.get(f"/balance/{quote_coin}") or "0.0"
-                    ),
+                    base_coin: await self._redis_handler.get_balance(base_coin),
+                    quote_coin: await self._redis_handler.get_balance(quote_coin),
                 }
 
                 tasks = []
@@ -182,21 +173,19 @@ class Dealer:
                     for b in self._exchange_handler.ids()
                     if a != b
                 ]:
-                    buy_order_book = await self._redis_client.get(
-                        f"/order_book/{symbol}/{buy_client_id}"
+                    buy_order_book = await self._redis_handler.get_order_book(
+                        symbol, buy_client_id
                     )
                     if buy_order_book is None:
                         continue
-                    buy_order_book = json.loads(buy_order_book)
                     asks = buy_order_book.get("asks")
                     if asks is None or len(asks) == 0:
                         continue
-                    sell_order_book = await self._redis_client.get(
-                        f"/order_book/{symbol}/{sell_client_id}"
+                    sell_order_book = await self._redis_handler.get_order_book(
+                        symbol, sell_client_id
                     )
                     if sell_order_book is None:
                         continue
-                    sell_order_book = json.loads(sell_order_book)
                     bids = sell_order_book.get("bids")
                     if bids is None or len(bids) == 0:
                         continue
@@ -247,10 +236,8 @@ class Dealer:
                         )
 
                 async def update_order_book(order_book, symbol):
-                    await self._redis_client.set(
-                        f"/order_book/{symbol}/{setting['exchange']}",
-                        json.dumps(order_book),
-                        ex=self._config_handler.expire_book_orders,
+                    await self._redis_handler.set_order_book(
+                        symbol, setting["exchange"], order_book
                     )
                     duration = str(datetime.now() - start)
                     self._logger.debug(
@@ -273,7 +260,7 @@ class Dealer:
             await asyncio.sleep(1)
 
     async def _watch_balance(self):
-        await self._redis_client.set("/balance/USDT", "100000")
+        await self._redis_handler.set_balance("USDT", 100000)
 
     async def _initialize(self):
         if self._initialized == True:
@@ -354,12 +341,7 @@ class Dealer:
         )
 
     async def _listen_bot_updates(self):
-        _last_update_id = await self._redis_client.get("/bot/last_update_id")
-        if _last_update_id is not None:
-            try:
-                _last_update_id = int(_last_update_id)
-            except:
-                pass
+        _last_update_id = await self._redis_handler.get_last_update_id()
 
         while True:
             try:
@@ -377,9 +359,7 @@ class Dealer:
                             case "/balance":
                                 await self.fetch_balance(update)
                     _last_update_id = update.update_id
-                    await self._redis_client.set(
-                        "/bot/last_update_id", str(_last_update_id)
-                    )
+                    await self._redis_handler.set_last_update_id(_last_update_id)
             except Exception as e:
                 self._logger.exception(
                     f"An error occurred while processing bot updates: [{type(e).__name__}] {str(e)}"
