@@ -3,32 +3,27 @@ import csv
 import json
 import os
 from datetime import datetime
-from types import CoroutineType
 
-import ccxt.pro as ccxt
-from ccxt.base.errors import RateLimitExceeded
 from redis.asyncio import Redis
 from telegram import Bot, Update
-from telegram.error import RetryAfter
 
-from anxiousbot import get_logger, split_coin
+from anxiousbot import exponential_backoff, get_logger, split_coin
 from anxiousbot.config import ConfigHandler
 from anxiousbot.deal import Deal
+from anxiousbot.exchange import ExchangeHandler
 
 
 class Dealer:
     def __init__(
         self,
-        config_handler: ConfigHandler,
     ):
-        self._config_handler = config_handler
+        self._config_handler = ConfigHandler()
+        self._exchange_handler = ExchangeHandler()
 
-        self._auth_exchanges = []
         self._bot_events = []
         self._bot_event_lock = asyncio.Lock()
         self._bot = Bot(self._config_handler.bot_token)
         self._initialized = False
-        self._exchanges = {}
         self._logger = get_logger(__name__)
         self._redis_client = Redis.from_url(self._config_handler.cache_endpoint)
 
@@ -147,7 +142,7 @@ class Dealer:
                     continue
                 icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
                 msg = f"{icon} {event['message']}"
-                await self._exponential_backoff(
+                await exponential_backoff(
                     self._bot.send_message,
                     chat_id=self._config_handler.bot_chat_id,
                     text=msg,
@@ -182,8 +177,8 @@ class Dealer:
                 tasks = []
                 for buy_client_id, sell_client_id in [
                     (a, b)
-                    for a in self._exchanges.keys()
-                    for b in self._exchanges.keys()
+                    for a in self._exchange_handler.ids()
+                    for b in self._exchange_handler.ids()
                     if a != b
                 ]:
                     buy_order_book = await self._redis_client.get(
@@ -206,9 +201,9 @@ class Dealer:
                         continue
                     deal = Deal(
                         symbol,
-                        self._exchanges[buy_client_id],
+                        self._exchange_handler.exchange(buy_client_id),
                         asks,
-                        self._exchanges[sell_client_id],
+                        self._exchange_handler.exchange(sell_client_id),
                         bids,
                     )
                     deal.calculate(balance)
@@ -226,13 +221,9 @@ class Dealer:
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
                 )
 
-    async def _close_exchange(self, client):
-        del self._exchanges[client.id]
-        return await client.close()
-
     async def _watch_order_book(self, setting):
         while True:
-            client = self._exchanges.get(setting["exchange"])
+            client = self._exchange_handler.exchange(setting["exchange"])
             if client is None:
                 await asyncio.sleep(0.5)
                 continue
@@ -244,15 +235,13 @@ class Dealer:
                 match setting["mode"]:
                     case "single":
                         await asyncio.sleep(0.5)
-                        order_book = await self._exponential_backoff(
+                        order_book = await exponential_backoff(
                             client.fetch_order_book, param[0]
                         )
                     case "all":
-                        order_book = await self._exponential_backoff(
-                            client.fetch_order_books
-                        )
+                        order_book = await exponential_backoff(client.fetch_order_books)
                     case "batch":
-                        order_book = await self._exponential_backoff(
+                        order_book = await exponential_backoff(
                             client.watch_order_book_for_symbols, param
                         )
 
@@ -339,11 +328,13 @@ class Dealer:
     async def fetch_balance(self, update):
         msg = ""
         for exchange_id in self._auth_exchanges:
-            if exchange_id not in self._exchanges:
+            if exchange_id not in self._exchange_handler.ids():
                 msg += f"{exchange_id}: Not initialized\n"
                 continue
             try:
-                balance = await self._exchanges[exchange_id].fetch_balance()
+                balance = await self._exchange_handler.exchange(
+                    exchange_id
+                ).fetch_balance()
                 msg += f"{exchange_id}: OK\n"
                 for symbol, value in balance.get("free").items():
                     if value > 0:
@@ -351,7 +342,7 @@ class Dealer:
             except Exception as e:
                 msg += f"{exchange_id}: error {e}\n"
 
-        await self._exponential_backoff(
+        await exponential_backoff(
             self._bot.send_message,
             chat_id=update.effective_message.chat_id,
             text=msg,
@@ -413,7 +404,8 @@ class Dealer:
                 ]
             tasks += [
                 asyncio.create_task(
-                    self._setup_exchange(id), name=f"_setup_exchange_{id}"
+                    self._exchange_handler.setup_exchange(id),
+                    name=f"setup_exchange_{id}",
                 )
                 for id in self._exchange_ids(self._config_handler.symbols)
             ]
@@ -440,93 +432,5 @@ class Dealer:
             return 1
 
     async def close(self):
-        tasks = [client.close() for client in self._exchanges.values()] + [
-            self._bot.shutdown()
-        ]
+        tasks = [self._exchange_handler.close(), self._bot.shutdown()]
         await asyncio.gather(*tasks)
-
-    async def _exponential_backoff(self, fn, *args, **kwargs):
-        backoff = [1, 2, 4, 8]
-        last_exception = None
-        for delay in backoff:
-            try:
-                return await fn(*args, **kwargs)
-            except asyncio.CancelledError as e:
-                raise e
-            except RateLimitExceeded as e:
-                await asyncio.sleep(60)
-                last_exception = e
-            except RetryAfter as e:
-                await asyncio.sleep(e.retry_after)
-                last_exception = e
-            except Exception as e:
-                await asyncio.sleep(delay)
-                if isinstance(e, CoroutineType):
-                    last_exception = await e
-                else:
-                    last_exception = e
-        raise last_exception
-
-    def _credentials(self, exchange_id):
-        auth_keys = [
-            "apiKey",
-            "secret",
-            "uid",
-            "accountId",
-            "login",
-            "password",
-            "twofa",
-            "privateKey",
-            "walletAddress",
-            "token",
-        ]
-        auth = dict(
-            [
-                (key, os.getenv(f"{exchange_id.upper()}_{key.upper()}"))
-                for key in auth_keys
-            ]
-        )
-        auth = dict(
-            [
-                (key, value.replace("\\n", "\n"))
-                for key, value in auth.items()
-                if value is not None
-            ]
-        )
-
-        if len(auth.keys()) == 0:
-            return None
-
-        return auth
-
-    async def _setup_exchange(self, exchange_id):
-        if exchange_id in self._exchanges:
-            return self._exchanges[exchange_id]
-
-        auth = self._credentials(exchange_id)
-        client_cls = getattr(ccxt, exchange_id)
-        if auth is not None:
-            client = client_cls(auth)
-            self._auth_exchanges += [client.id]
-            self._logger.debug(
-                f"{exchange_id} logged in",
-                extra={"exchange": exchange_id},
-            )
-        else:
-            client = client_cls()
-
-        while True:
-            try:
-                await self._exponential_backoff(client.load_markets)
-                self._logger.info(
-                    f"{exchange_id} loaded markets",
-                    extra={"exchange": exchange_id},
-                )
-                break
-            except Exception as e:
-                self._logger.exception(e, extra={"exchange": exchange_id})
-                await client.close()
-                await asyncio.sleep(1)
-
-        self._exchanges[client.id] = client
-        return client

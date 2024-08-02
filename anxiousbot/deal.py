@@ -1,11 +1,21 @@
 import copy
 from datetime import datetime
+from typing import Dict, List
+
+from ccxt.base.exchange import Exchange
 
 from anxiousbot import split_coin
 
 
 class Deal:
-    def __init__(self, symbol, buy_exchange, buy_asks, sell_exchange, sell_bids):
+    def __init__(
+        self,
+        symbol: str,
+        buy_exchange: Exchange,
+        buy_asks: List,
+        sell_exchange: Exchange,
+        sell_bids: List,
+    ):
         self.symbol = symbol
         self.buy_exchange = buy_exchange
         self.sell_exchange = sell_exchange
@@ -24,7 +34,7 @@ class Deal:
         self.buy_total_base = 0
         self.sell_total_quote = 0
 
-    def calculate(self, balance):
+    def calculate(self, balance: Dict):
         base_coin, quote_coin = split_coin(self.symbol)
 
         if base_coin not in balance:

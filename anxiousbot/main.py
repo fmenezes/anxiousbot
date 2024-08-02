@@ -6,7 +6,6 @@ import threading
 from dotenv import load_dotenv
 
 from anxiousbot import closing, get_logger
-from anxiousbot.config import ConfigHandler
 from anxiousbot.dealer import Dealer
 
 
@@ -31,7 +30,7 @@ async def _main():
     threading.excepthook = _thread_excepthook
     sys.excepthook = _sys_excepthook
 
-    async with closing(Dealer(config_handler=ConfigHandler())) as service:
+    async with closing(Dealer()) as service:
         return await service.run()
 
 
