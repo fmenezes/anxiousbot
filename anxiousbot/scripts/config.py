@@ -52,7 +52,7 @@ async def _run():
         symbol_list = json.load(f)
     filtered_symbol_list = _filter_symbols(symbol_list)
     data = _split_machines(filtered_symbol_list, 50)
-    data = [','.join(symbols) for symbols in data]
+    data = [",".join(symbols) for symbols in data]
 
     with open(f"./config/instances.json", "w") as f:
         json.dump(data, fp=f, indent=2)
