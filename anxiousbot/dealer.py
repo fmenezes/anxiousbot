@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import csv
 import json
 import os
@@ -13,56 +12,25 @@ from telegram import Bot, Update
 from telegram.error import RetryAfter
 
 from anxiousbot import get_logger, split_coin
+from anxiousbot.config import ConfigHandler
 from anxiousbot.deal import Deal
-
-DEFAULT_EXIPRE_DEAL_EVENTS = 60
-DEFAULT_EXPIRE_BOOK_ORDERS = 60
-DEFAULT_CACHE_ENDPOINT = "redis://localhost"
-DEFAULT_SYMBOLS = ["BTC/USDT"]
 
 
 class Dealer:
     def __init__(
         self,
-        bot_token,
-        bot_chat_id,
-        expire_book_orders=None,
-        expire_deal_events=None,
-        cache_endpoint=None,
-        symbols=None,
-        run_bot_updates=None,
+        config_handler: ConfigHandler,
     ):
-        if symbols is None:
-            symbols = DEFAULT_SYMBOLS
-
-        if cache_endpoint is None:
-            cache_endpoint = DEFAULT_CACHE_ENDPOINT
-
-        if expire_book_orders is None:
-            expire_book_orders = DEFAULT_EXPIRE_BOOK_ORDERS
-
-        if expire_deal_events is None:
-            expire_deal_events = DEFAULT_EXIPRE_DEAL_EVENTS
-
-        if run_bot_updates is None:
-            run_bot_updates = True
-
-        self._run_bot_updates = run_bot_updates
-        self._bot_token = bot_token
-        self._bot_chat_id = bot_chat_id
-        self._symbols = symbols
-        self._expire_book_orders = expire_book_orders
-        self._expire_deal_events = expire_deal_events
-        self._cache_endpoint = cache_endpoint
+        self._config_handler = config_handler
 
         self._auth_exchanges = []
         self._bot_events = []
         self._bot_event_lock = asyncio.Lock()
-        self._bot = Bot(self._bot_token)
+        self._bot = Bot(self._config_handler.bot_token)
         self._initialized = False
         self._exchanges = {}
         self._logger = get_logger(__name__)
-        self._redis_client = Redis.from_url(cache_endpoint)
+        self._redis_client = Redis.from_url(self._config_handler.cache_endpoint)
 
     def _write_deal_xml(self, deal_event):
         if deal_event["type"] != "close":
@@ -152,7 +120,7 @@ class Dealer:
         await self._redis_client.set(
             f"/deal/{deal.symbol}/{deal.buy_exchange.id}/{deal.sell_exchange.id}",
             json.dumps(new_event),
-            ex=self._expire_deal_events,
+            ex=self._config_handler.expire_deal_events,
         )
 
         if new_event["type"] != "noop":
@@ -181,7 +149,7 @@ class Dealer:
                 msg = f"{icon} {event['message']}"
                 await self._exponential_backoff(
                     self._bot.send_message,
-                    chat_id=self._bot_chat_id,
+                    chat_id=self._config_handler.bot_chat_id,
                     text=msg,
                     read_timeout=35,
                     write_timeout=35,
@@ -292,7 +260,7 @@ class Dealer:
                     await self._redis_client.set(
                         f"/order_book/{symbol}/{setting['exchange']}",
                         json.dumps(order_book),
-                        ex=self._expire_book_orders,
+                        ex=self._config_handler.expire_book_orders,
                     )
                     duration = str(datetime.now() - start)
                     self._logger.debug(
@@ -306,7 +274,7 @@ class Dealer:
 
                 if setting["mode"] == "all" or setting["mode"] == "batch":
                     for symbol, order in order_book.items():
-                        if symbol in self._symbols:
+                        if symbol in self._config_handler.symbols:
                             await update_order_book(order, symbol)
                 else:
                     await update_order_book(order_book, order_book["symbol"])
@@ -437,7 +405,7 @@ class Dealer:
                 ),
                 asyncio.create_task(self._watch_balance(), name="_watch_balance"),
             ]
-            if self._run_bot_updates:
+            if self._config_handler.run_bot_updates:
                 tasks += [
                     asyncio.create_task(
                         self._listen_bot_updates(), name="_listen_bot_updates"
@@ -447,15 +415,15 @@ class Dealer:
                 asyncio.create_task(
                     self._setup_exchange(id), name=f"_setup_exchange_{id}"
                 )
-                for id in self._exchange_ids(self._symbols)
+                for id in self._exchange_ids(self._config_handler.symbols)
             ]
             tasks += [
                 asyncio.create_task(
                     self._watch_deals(symbol), name=f"_watch_deals_{symbol}"
                 )
-                for symbol in self._symbols
+                for symbol in self._config_handler.symbols
             ]
-            for setting in self._update_settings(self._symbols):
+            for setting in self._update_settings(self._config_handler.symbols):
                 task_name = f"_watch_order_book_{setting['exchange']}"
                 if setting["mode"] == "single":
                     task_name += f"_{setting['symbols'][0]}"
