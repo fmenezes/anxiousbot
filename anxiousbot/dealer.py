@@ -7,10 +7,11 @@ from datetime import datetime
 from redis.asyncio import Redis
 from telegram import Bot, Update
 
-from anxiousbot import exponential_backoff, get_logger, split_coin
+from anxiousbot import exponential_backoff, split_coin
 from anxiousbot.config import ConfigHandler
 from anxiousbot.deal import Deal
 from anxiousbot.exchange import ExchangeHandler
+from anxiousbot.log import get_logger
 
 
 class Dealer:

@@ -5,8 +5,9 @@ import threading
 
 from dotenv import load_dotenv
 
-from anxiousbot import closing, get_logger
+from anxiousbot import closing
 from anxiousbot.dealer import Dealer
+from anxiousbot.log import get_logger
 
 
 async def _main():
