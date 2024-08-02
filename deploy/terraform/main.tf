@@ -252,18 +252,18 @@ resource "aws_cloudwatch_dashboard" "main" {
   )
 }
 
-data "external" "count_config_files" {
-  program = ["bash", "count_config_files.sh"]
-}
-
 resource "aws_key_pair" "anxiousbot_key" {
   key_name   = "anxiousbot-key"
   public_key = file("~/.ssh/anxiousbot_key.pub")
 }
 
+locals {
+  config = jsondecode(file("../../config/instances.json"))
+}
+
 # EC2 Instance
 resource "aws_instance" "server" {
-  count                       = data.external.count_config_files.result.files
+  count                       = length(local.config)
   ami                         = "ami-01b799c439fd5516a"
   instance_type               = "t2.medium"
   subnet_id                   = aws_subnet.main.id
@@ -276,7 +276,7 @@ resource "aws_instance" "server" {
     #!/bin/bash
     mkdir -p /etc/anxiousbot
     echo 'S3BUCKET="${data.aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
-    echo 'CONFIG_PATH="config/config-${count.index}.json"' >> /etc/anxiousbot/.env
+    echo 'SYMBOLS="${local.config[count.index]}"' >> /etc/anxiousbot/.env
     echo 'CACHE_ENDPOINT="redis://${aws_elasticache_replication_group.cache_cluster_group.primary_endpoint_address}:${aws_elasticache_replication_group.cache_cluster_group.port == null ? 6379 : aws_elasticache_replication_group.cache_cluster_group.port}"' >> /etc/anxiousbot/.env
   EOF
 

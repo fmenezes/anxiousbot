@@ -52,14 +52,10 @@ async def _run():
         symbol_list = json.load(f)
     filtered_symbol_list = _filter_symbols(symbol_list)
     data = _split_machines(filtered_symbol_list, 50)
-    data = [{"symbols": entry} for entry in data]
+    data = [','.join(symbols) for symbols in data]
 
-    for filename in glob("./config/config-*.json"):
-        os.remove(filename)
-
-    for i in range(len(data)):
-        with open(f"./config/config-{i}.json", "w") as f:
-            json.dump(data[i], fp=f, indent=2)
+    with open(f"./config/instances.json", "w") as f:
+        json.dump(data, fp=f, indent=2)
 
 
 def _main():

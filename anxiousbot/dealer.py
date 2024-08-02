@@ -16,8 +16,8 @@ from anxiousbot import get_logger, split_coin
 
 DEFAULT_EXIPRE_DEAL_EVENTS = 60
 DEFAULT_EXPIRE_BOOK_ORDERS = 60
-DEFAULT_CONFIG_PATH = "./config/local.json"
 DEFAULT_CACHE_ENDPOINT = "redis://localhost"
+DEFAULT_SYMBOLS = ["BTC/USDT"]
 
 
 class Deal:
@@ -201,11 +201,11 @@ class Dealer:
         expire_book_orders=None,
         expire_deal_events=None,
         cache_endpoint=None,
-        config_path=None,
+        symbols=None,
         run_bot_updates=None,
     ):
-        if config_path is None:
-            config_path = DEFAULT_CONFIG_PATH
+        if symbols is None:
+            symbols = DEFAULT_SYMBOLS
 
         if cache_endpoint is None:
             cache_endpoint = DEFAULT_CACHE_ENDPOINT
@@ -222,7 +222,7 @@ class Dealer:
         self._run_bot_updates = run_bot_updates
         self._bot_token = bot_token
         self._bot_chat_id = bot_chat_id
-        self._config_path = config_path
+        self._symbols = symbols
         self._expire_book_orders = expire_book_orders
         self._expire_deal_events = expire_deal_events
         self._cache_endpoint = cache_endpoint
@@ -233,7 +233,7 @@ class Dealer:
         self._bot = Bot(self._bot_token)
         self._initialized = False
         self._exchanges = {}
-        self._logger = get_logger(__name__, extra={"config": self._config_path})
+        self._logger = get_logger(__name__)
         self._redis_client = Redis.from_url(cache_endpoint)
 
     def _write_deal_xml(self, deal_event):
@@ -477,7 +477,7 @@ class Dealer:
 
                 if setting["mode"] == "all" or setting["mode"] == "batch":
                     for symbol, order in order_book.items():
-                        if symbol in self.config["symbols"]:
+                        if symbol in self._symbols:
                             await update_order_book(order, symbol)
                 else:
                     await update_order_book(order_book, order_book["symbol"])
@@ -495,9 +495,6 @@ class Dealer:
         await self._bot.set_my_commands([("balance", "fetch balance")])
         await self._bot.set_my_short_description("anxiousbot trading without patience")
         await self._bot.set_my_description("anxiousbot trading without patience")
-
-        with open(self._config_path, "r") as f:
-            self.config = json.load(f)
 
         with open("./config/exchanges.json", "r") as f:
             self.exchanges_param = json.load(f)
@@ -594,7 +591,6 @@ class Dealer:
         try:
             await self._initialize()
             self._logger.debug(f"Bot initialized")
-            symbols = self.config["symbols"]
 
             tasks = [
                 asyncio.create_task(
@@ -608,15 +604,15 @@ class Dealer:
                 asyncio.create_task(
                     self._setup_exchange(id), name=f"_setup_exchange_{id}"
                 )
-                for id in self._exchange_ids(symbols)
+                for id in self._exchange_ids(self._symbols)
             ]
             tasks += [
                 asyncio.create_task(
                     self._watch_deals(symbol), name=f"_watch_deals_{symbol}"
                 )
-                for symbol in symbols
+                for symbol in self._symbols
             ]
-            for setting in self._update_settings(symbols):
+            for setting in self._update_settings(self._symbols):
                 task_name = f"_watch_order_book_{setting['exchange']}"
                 if setting["mode"] == "single":
                     task_name += f"_{setting['symbols'][0]}"
