@@ -85,10 +85,10 @@ class ExchangeHandler:
     def ids(self) -> List[str]:
         return list(self._exchanges.keys())
 
-    def exchange(self, id) -> Exchange | None:
+    def exchange(self, id: str) -> Exchange | None:
         return self._exchanges.get(id)
 
-    def is_authenticated(self, id) -> bool:
+    def is_authenticated(self, id: str) -> bool:
         return id in self._auth_exchanges
 
     async def close_exchange(self, exchange_id: str) -> None:

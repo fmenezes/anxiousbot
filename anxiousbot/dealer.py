@@ -7,11 +7,12 @@ from datetime import datetime
 from telegram import Bot, Update
 
 from anxiousbot import exponential_backoff, split_coin
-from anxiousbot.config import ConfigHandler
+from anxiousbot.config_handler import ConfigHandler
 from anxiousbot.deal import Deal
-from anxiousbot.exchange import ExchangeHandler
+from anxiousbot.exchange_handler import ExchangeHandler
 from anxiousbot.log import get_logger
 from anxiousbot.redis_handler import RedisHandler
+from anxiousbot.trader_handler import TraderHandler
 
 
 class Dealer:
@@ -20,7 +21,8 @@ class Dealer:
     ):
         self._config_handler = ConfigHandler()
         self._exchange_handler = ExchangeHandler()
-        self._redis_handler = RedisHandler()
+        self._redis_handler = RedisHandler(self._config_handler)
+        self._trader_handler = TraderHandler(self._exchange_handler)
 
         self._bot_events = []
         self._bot_event_lock = asyncio.Lock()
@@ -314,21 +316,21 @@ class Dealer:
                         yield {**setting, "symbols": [symbol]}
 
     async def fetch_balance(self, update):
+        result = await self._trader_handler.fetch_balance()
         msg = ""
-        for exchange_id in self._auth_exchanges:
-            if exchange_id not in self._exchange_handler.ids():
-                msg += f"{exchange_id}: Not initialized\n"
-                continue
-            try:
-                balance = await self._exchange_handler.exchange(
-                    exchange_id
-                ).fetch_balance()
-                msg += f"{exchange_id}: OK\n"
-                for symbol, value in balance.get("free").items():
-                    if value > 0:
-                        msg += f"  {symbol} {value:.8f}\n"
-            except Exception as e:
-                msg += f"{exchange_id}: error {e}\n"
+        for exchange_id, data in result.items():
+            match data["status"]:
+                case "NOT_AUTH":
+                    continue
+                case "NOT_INIT":
+                    msg += f"{exchange_id}: Not initialized\n"
+                case "ERROR":
+                    msg += f"{exchange_id}: Error: {data["exception"]}\n"
+                case "OK":
+                    msg += f"{exchange_id}: OK\n"
+                    for symbol, value in data["balance"].get("free").items():
+                        if value > 0:
+                            msg += f"  {symbol} {value:.8f}\n"
 
         await exponential_backoff(
             self._bot.send_message,

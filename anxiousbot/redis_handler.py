@@ -4,12 +4,12 @@ from typing import Any, Dict
 
 from redis.asyncio import Redis
 
-from anxiousbot.config import ConfigHandler
+from anxiousbot.config_handler import ConfigHandler
 
 
 class RedisHandler:
-    def __init__(self):
-        self._config_handler = ConfigHandler()
+    def __init__(self, config_handler: ConfigHandler):
+        self._config_handler = config_handler
         self._redis_client = Redis.from_url(self._config_handler.cache_endpoint)
 
     async def _get(self, key: str, default: Any = None) -> Any:
