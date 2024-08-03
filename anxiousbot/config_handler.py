@@ -1,4 +1,6 @@
+import json
 import os
+from typing import Dict
 
 DEFAULT_EXIPRE_DEAL_EVENTS = "60"
 DEFAULT_EXPIRE_BOOK_ORDERS = "60"
@@ -30,6 +32,10 @@ class ConfigHandler:
             "true",
             "t",
         ]
+        with open("./config/exchanges.json", "r") as f:
+            self._exchanges_param = json.load(f)
+        with open("./config/symbols.json", "r") as f:
+            self._symbols_param = json.load(f)
 
     @property
     def run_bot_updates(self):
@@ -58,3 +64,11 @@ class ConfigHandler:
     @property
     def cache_endpoint(self):
         return self._cache_endpoint
+
+    @property
+    def exchanges_param(self) -> Dict:
+        return self._exchanges_param
+
+    @property
+    def symbols_param(self) -> Dict:
+        return self._symbols_param

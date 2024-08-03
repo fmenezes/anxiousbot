@@ -1,6 +1,5 @@
 import asyncio
 import csv
-import json
 import os
 from datetime import datetime
 
@@ -11,6 +10,7 @@ from anxiousbot.config_handler import ConfigHandler
 from anxiousbot.deal import Deal
 from anxiousbot.exchange_handler import ExchangeHandler
 from anxiousbot.log import get_logger
+from anxiousbot.order_book_handler import OrderBookHandler
 from anxiousbot.redis_handler import RedisHandler
 from anxiousbot.trader_handler import TraderHandler
 
@@ -23,6 +23,9 @@ class Dealer:
         self._exchange_handler = ExchangeHandler()
         self._redis_handler = RedisHandler(self._config_handler)
         self._trader_handler = TraderHandler(self._exchange_handler)
+        self._order_book_handler = OrderBookHandler(
+            self._config_handler, self._exchange_handler, self._redis_handler
+        )
 
         self._bot_events = []
         self._bot_event_lock = asyncio.Lock()
@@ -213,54 +216,6 @@ class Dealer:
                     f"An error occurred: [{type(e).__name__}] {str(e)}"
                 )
 
-    async def _watch_order_book(self, setting):
-        while True:
-            client = self._exchange_handler.exchange(setting["exchange"])
-            if client is None:
-                await asyncio.sleep(0.5)
-                continue
-            break
-        while True:
-            try:
-                start = datetime.now()
-                param = setting["symbols"]
-                match setting["mode"]:
-                    case "single":
-                        await asyncio.sleep(0.5)
-                        order_book = await exponential_backoff(
-                            client.fetch_order_book, param[0]
-                        )
-                    case "all":
-                        order_book = await exponential_backoff(client.fetch_order_books)
-                    case "batch":
-                        order_book = await exponential_backoff(
-                            client.watch_order_book_for_symbols, param
-                        )
-
-                async def update_order_book(order_book, symbol):
-                    await self._redis_handler.set_order_book(
-                        symbol, setting["exchange"], order_book
-                    )
-                    duration = str(datetime.now() - start)
-                    self._logger.debug(
-                        f"Updated {setting['exchange']} in {duration}",
-                        extra={
-                            "exchange": setting["exchange"],
-                            "duration": duration,
-                            "symbol": symbol,
-                        },
-                    )
-
-                if setting["mode"] == "all" or setting["mode"] == "batch":
-                    for symbol, order in order_book.items():
-                        if symbol in self._config_handler.symbols:
-                            await update_order_book(order, symbol)
-                else:
-                    await update_order_book(order_book, order_book["symbol"])
-            except Exception as e:
-                self._logger.exception(e, extra={"exchange": setting["exchange"]})
-            await asyncio.sleep(1)
-
     async def _watch_balance(self):
         await self._redis_handler.set_balance("USDT", 100000)
 
@@ -272,48 +227,7 @@ class Dealer:
         await self._bot.set_my_short_description("anxiousbot trading without patience")
         await self._bot.set_my_description("anxiousbot trading without patience")
 
-        with open("./config/exchanges.json", "r") as f:
-            self.exchanges_param = json.load(f)
-
-        with open("./config/symbols.json", "r") as f:
-            self.symbols_param = json.load(f)
-
         self._initialized = True
-
-    def _exchange_ids(self, symbols):
-        return list(
-            set(
-                [
-                    exchange
-                    for symbol in symbols
-                    for exchange in self.symbols_param[symbol]["exchanges"]
-                ]
-            )
-        )
-
-    def _update_settings(self, symbols):
-        ids = self._exchange_ids(symbols)
-        settings = [
-            {
-                **self.exchanges_param[id],
-                "symbols": [
-                    symbol
-                    for symbol in self.exchanges_param[id]["symbols"]
-                    if symbol in symbols
-                ],
-            }
-            for id in ids
-        ]
-        settings = [entry for entry in settings if len(entry["symbols"]) > 0]
-        for setting in settings:
-            match setting["mode"]:
-                case "all":
-                    yield setting
-                case "batch":
-                    yield setting
-                case "single":
-                    for symbol in setting["symbols"]:
-                        yield {**setting, "symbols": [symbol]}
 
     async def fetch_balance(self, update):
         result = await self._trader_handler.fetch_balance()
@@ -378,6 +292,9 @@ class Dealer:
                     self._process_bot_events(), name="_process_bot_events"
                 ),
                 asyncio.create_task(self._watch_balance(), name="_watch_balance"),
+                asyncio.create_task(
+                    self._order_book_handler.watch(), name=f"order_book_handler_watch"
+                ),
             ]
             if self._config_handler.run_bot_updates:
                 tasks += [
@@ -390,7 +307,7 @@ class Dealer:
                     self._exchange_handler.setup_exchange(id),
                     name=f"setup_exchange_{id}",
                 )
-                for id in self._exchange_ids(self._config_handler.symbols)
+                for id in self._order_book_handler.exchange_ids()
             ]
             tasks += [
                 asyncio.create_task(
@@ -398,13 +315,6 @@ class Dealer:
                 )
                 for symbol in self._config_handler.symbols
             ]
-            for setting in self._update_settings(self._config_handler.symbols):
-                task_name = f"_watch_order_book_{setting['exchange']}"
-                if setting["mode"] == "single":
-                    task_name += f"_{setting['symbols'][0]}"
-                tasks += [
-                    asyncio.create_task(self._watch_order_book(setting), name=task_name)
-                ]
 
             await asyncio.gather(*tasks)
             self._logger.info(f"Dealer exited")
@@ -415,5 +325,9 @@ class Dealer:
             return 1
 
     async def close(self):
-        tasks = [self._exchange_handler.close(), self._bot.shutdown()]
+        tasks = [
+            self._exchange_handler.close(),
+            self._bot.shutdown(),
+            self._order_book_handler.close(),
+        ]
         await asyncio.gather(*tasks)

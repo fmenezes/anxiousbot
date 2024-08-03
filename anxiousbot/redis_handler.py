@@ -19,7 +19,7 @@ class RedisHandler:
         return json.loads(result)
 
     async def _set(self, key: str, value: Any, *args, **kwargs) -> None:
-        await self._redis_client.set(key, value, *args, **kwargs)
+        await self._redis_client.set(key, json.dumps(value), *args, **kwargs)
 
     async def get_deal(
         self, symbol: str, buy_exchange_id: str, sell_exchange_id: str
