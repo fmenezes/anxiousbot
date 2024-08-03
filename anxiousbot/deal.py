@@ -24,17 +24,17 @@ class Deal:
         self.ts = datetime.now()
 
         # known after calculating
-        self.buy_price_min = 0
-        self.buy_price_max = 0
-        self.sell_price_min = 0
-        self.sell_price_max = 0
+        self.buy_price_min = 0.0
+        self.buy_price_max = 0.0
+        self.sell_price_min = 0.0
+        self.sell_price_max = 0.0
         self.sell_orders = []
         self.buy_orders = []
-        self.buy_total_quote = 0
-        self.buy_total_base = 0
-        self.sell_total_quote = 0
+        self.buy_total_quote = 0.0
+        self.buy_total_base = 0.0
+        self.sell_total_quote = 0.0
 
-    def calculate(self, balance: Dict):
+    def calculate(self, balance: Dict) -> None:
         base_coin, quote_coin = split_coin(self.symbol)
 
         if base_coin not in balance:
@@ -100,20 +100,20 @@ class Deal:
                 sell_index += 1
 
     @property
-    def profit(self):
+    def profit(self) -> float:
         return self.sell_total_quote - self.buy_total_quote
 
     @property
-    def profit_percentage(self):
+    def profit_percentage(self) -> float:
         if self.buy_total_quote == 0:
             return 0
         return self.profit / self.buy_total_quote * 100
 
     @property
-    def threshold(self):
+    def threshold(self) -> bool:
         return self.profit_percentage >= 1 and self.profit >= 10
 
-    def to_dict(self):
+    def to_dict(self) -> Dict:
         return {
             "ts": self.format_ts(),
             "symbol": self.symbol,
@@ -127,13 +127,13 @@ class Deal:
             "threshold": self.threshold,
         }
 
-    def format_profit(self):
+    def format_profit(self) -> str:
         try:
             return self.sell_exchange.price_to_precision(self.symbol, self.profit)
         except:
             return f"{self.profit:2f}"
 
-    def format_profit_percentage(self):
+    def format_profit_percentage(self) -> str:
         try:
             return self.sell_exchange.decimal_to_precision(
                 self.profit_percentage, precision=2
@@ -141,47 +141,47 @@ class Deal:
         except:
             return f"{self.profit_percentage:2f}"
 
-    def format_buy_price_min(self):
+    def format_buy_price_min(self) -> str:
         try:
             return self.buy_exchange.price_to_precision(self.buy_price_min)
         except:
             return f"{self.buy_price_min:2f}"
 
-    def format_buy_price_max(self):
+    def format_buy_price_max(self) -> str:
         try:
             return self.buy_exchange.price_to_precision(self.buy_price_max)
         except:
             return f"{self.buy_price_max:2f}"
 
-    def format_buy_total_quote(self):
+    def format_buy_total_quote(self) -> str:
         try:
             return self.buy_exchange.amount_to_precision(self.buy_total_quote)
         except:
             return f"{self.buy_total_quote:2f}"
 
-    def format_buy_total_base(self):
+    def format_buy_total_base(self) -> str:
         try:
             return self.buy_exchange.amount_to_precision(self.buy_total_base)
         except:
             return f"{self.buy_total_base:2f}"
 
-    def format_sell_price_min(self):
+    def format_sell_price_min(self) -> str:
         try:
             return self.sell_exchange.price_to_precision(self.sell_price_min)
         except:
             return f"{self.sell_price_min:2f}"
 
-    def format_sell_price_max(self):
+    def format_sell_price_max(self) -> str:
         try:
             return self.sell_exchange.price_to_precision(self.sell_price_max)
         except:
             return f"{self.sell_price_max:2f}"
 
-    def format_sell_total_quote(self):
+    def format_sell_total_quote(self) -> str:
         try:
             return self.sell_exchange.amount_to_precision(self.sell_total_quote)
         except:
             return f"{self.sell_total_quote:2f}"
 
-    def format_ts(self):
+    def format_ts(self) -> str:
         return str(self.ts)
