@@ -22,21 +22,8 @@ class OrderBookHandler:
         self._logger = get_logger(__name__)
         self._loop = True
 
-    def exchange_ids(self) -> List[str]:
-        return list(
-            set(
-                [
-                    exchange
-                    for symbol in self._config_handler.symbols
-                    for exchange in self._config_handler.symbols_param[symbol][
-                        "exchanges"
-                    ]
-                ]
-            )
-        )
-
     def _update_settings(self) -> Iterator[Dict]:
-        ids = self.exchange_ids()
+        ids = self._exchange_handler.available_ids()
         settings = [
             {
                 **self._config_handler.exchanges_param[id],

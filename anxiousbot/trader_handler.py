@@ -10,12 +10,9 @@ class TraderHandler:
 
     async def fetch_balance(self) -> Dict:
         balances = {}
-        for exchange_id in self._exchange_handler.ids():
+        for exchange_id in self._exchange_handler.initialized_ids():
             if not self._exchange_handler.is_authenticated(exchange_id):
                 balances[exchange_id] = {"status": "NOT_AUTH"}
-                continue
-            if exchange_id not in self._exchange_handler.ids():
-                balances[exchange_id] = {"status": "NOT_INIT"}
                 continue
             try:
                 balance = await exponential_backoff(

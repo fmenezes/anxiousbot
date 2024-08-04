@@ -174,8 +174,8 @@ class Dealer:
                 tasks = []
                 for buy_client_id, sell_client_id in [
                     (a, b)
-                    for a in self._exchange_handler.ids()
-                    for b in self._exchange_handler.ids()
+                    for a in self._exchange_handler.initialized_ids()
+                    for b in self._exchange_handler.initialized_ids()
                     if a != b
                 ]:
                     buy_order_book = await self._redis_handler.get_order_book(
@@ -304,10 +304,9 @@ class Dealer:
                 ]
             tasks += [
                 asyncio.create_task(
-                    self._exchange_handler.setup_exchange(id),
-                    name=f"setup_exchange_{id}",
+                    self._exchange_handler.setup_all_exchanges(),
+                    name=f"setup_all_exchanges",
                 )
-                for id in self._order_book_handler.exchange_ids()
             ]
             tasks += [
                 asyncio.create_task(
