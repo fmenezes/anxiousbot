@@ -59,5 +59,5 @@ class RedisHandler:
     async def set_last_update_id(self, value: int) -> None:
         await self._set("/bot/last_update_id", value)
 
-    async def close(self) -> None:
-        await self._redis_client.close()
+    async def aclose(self) -> None:
+        await self._redis_client.aclose()

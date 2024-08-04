@@ -94,7 +94,7 @@ class OrderBookHandler:
                 self._logger.exception(e, extra={"exchange": setting["exchange"]})
             await asyncio.sleep(1)
 
-    async def close(self) -> None:
+    async def aclose(self) -> None:
         self._loop = False
 
     async def watch(self) -> None:

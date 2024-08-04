@@ -1,11 +1,10 @@
 import asyncio
-import os
 import sys
 import threading
+from contextlib import aclosing
 
 from dotenv import load_dotenv
 
-from anxiousbot import closing
 from anxiousbot.dealer import Dealer
 from anxiousbot.log import get_logger
 
@@ -31,7 +30,7 @@ async def _main():
     threading.excepthook = _thread_excepthook
     sys.excepthook = _sys_excepthook
 
-    async with closing(Dealer()) as service:
+    async with aclosing(Dealer()) as service:
         return await service.run()
 
 

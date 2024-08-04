@@ -124,6 +124,6 @@ class BotHandler:
                     f"An error occurred while processing bot updates: [{type(e).__name__}] {str(e)}"
                 )
 
-    async def close(self) -> None:
+    async def aclose(self) -> None:
         self._loop = False
         await self._bot.shutdown()

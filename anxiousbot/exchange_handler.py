@@ -124,7 +124,7 @@ class ExchangeHandler:
         del self._exchange[exchange_id]
         self._auth_exchanges = [id for id in self._auth_exchanges if id != exchange_id]
 
-    async def close(self):
+    async def aclose(self):
         self._loop = False
         ids = self.initialized_ids()
         await asyncio.gather(*[self.close_exchange(id) for id in ids])

@@ -231,11 +231,11 @@ class Dealer:
             self._logger.exception(f"An error occurred: [{type(e).__name__}] {str(e)}")
             return 1
 
-    async def close(self):
+    async def aclose(self):
         tasks = [
-            self._exchange_handler.close(),
-            self._bot_handler.close(),
-            self._order_book_handler.close(),
+            self._exchange_handler.aclose(),
+            self._bot_handler.aclose(),
+            self._order_book_handler.aclose(),
         ]
         await asyncio.gather(*tasks)
-        await self._redis_handler.close()
+        await self._redis_handler.aclose()
