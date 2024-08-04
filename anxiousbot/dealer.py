@@ -3,9 +3,8 @@ import csv
 import os
 from datetime import datetime
 
-from telegram import Bot, Update
-
 from anxiousbot import exponential_backoff, split_coin
+from anxiousbot.bot_handler import BotHandler
 from anxiousbot.config_handler import ConfigHandler
 from anxiousbot.deal import Deal
 from anxiousbot.exchange_handler import ExchangeHandler
@@ -20,17 +19,19 @@ class Dealer:
         self,
     ):
         self._config_handler = ConfigHandler()
-        self._exchange_handler = ExchangeHandler()
+        self._exchange_handler = ExchangeHandler(self._config_handler)
         self._redis_handler = RedisHandler(self._config_handler)
-        self._trader_handler = TraderHandler(self._exchange_handler)
         self._order_book_handler = OrderBookHandler(
             self._config_handler, self._exchange_handler, self._redis_handler
         )
 
+        trader_handler = TraderHandler(self._exchange_handler)
+        self._bot_handler = BotHandler(
+            self._config_handler, self._redis_handler, trader_handler
+        )
+
         self._bot_events = []
         self._bot_event_lock = asyncio.Lock()
-        self._bot = Bot(self._config_handler.bot_token)
-        self._initialized = False
         self._logger = get_logger(__name__)
 
     def _write_deal_xml(self, deal_event):
@@ -144,13 +145,8 @@ class Dealer:
                 icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
                 msg = f"{icon} {event['message']}"
                 await exponential_backoff(
-                    self._bot.send_message,
-                    chat_id=self._config_handler.bot_chat_id,
+                    self._bot_handler.send_message,
                     text=msg,
-                    read_timeout=35,
-                    write_timeout=35,
-                    connect_timeout=35,
-                    pool_timeout=35,
                 )
             except Exception as e:
                 self._logger.exception(
@@ -219,73 +215,10 @@ class Dealer:
     async def _watch_balance(self):
         await self._redis_handler.set_balance("USDT", 100000)
 
-    async def _initialize(self):
-        if self._initialized == True:
-            return
-        await self._bot.initialize()
-        await self._bot.set_my_commands([("balance", "fetch balance")])
-        await self._bot.set_my_short_description("anxiousbot trading without patience")
-        await self._bot.set_my_description("anxiousbot trading without patience")
-
-        self._initialized = True
-
-    async def fetch_balance(self, update):
-        result = await self._trader_handler.fetch_balance()
-        msg = ""
-        for exchange_id, data in result.items():
-            match data["status"]:
-                case "NOT_AUTH":
-                    continue
-                case "NOT_INIT":
-                    msg += f"{exchange_id}: Not initialized\n"
-                case "ERROR":
-                    msg += f"{exchange_id}: Error: {data["exception"]}\n"
-                case "OK":
-                    msg += f"{exchange_id}: OK\n"
-                    for symbol, value in data["balance"].get("free").items():
-                        if value > 0:
-                            msg += f"  {symbol} {value:.8f}\n"
-
-        await exponential_backoff(
-            self._bot.send_message,
-            chat_id=update.effective_message.chat_id,
-            text=msg,
-            read_timeout=35,
-            write_timeout=35,
-            connect_timeout=35,
-            pool_timeout=35,
-        )
-
-    async def _listen_bot_updates(self):
-        _last_update_id = await self._redis_handler.get_last_update_id()
-
-        while True:
-            try:
-                updates = await self._bot.get_updates(
-                    offset=_last_update_id, timeout=10, allowed_updates=Update.MESSAGE
-                )
-                for update in updates:
-                    if (
-                        _last_update_id is not None
-                        and update.update_id <= _last_update_id
-                    ):
-                        continue
-                    if update.message and update.message.text:
-                        match update.message.text:
-                            case "/balance":
-                                await self.fetch_balance(update)
-                    _last_update_id = update.update_id
-                    await self._redis_handler.set_last_update_id(_last_update_id)
-            except Exception as e:
-                self._logger.exception(
-                    f"An error occurred while processing bot updates: [{type(e).__name__}] {str(e)}"
-                )
-
     async def run(self):
         self._logger.info(f"Dealer started")
         try:
-            await self._initialize()
-            self._logger.debug(f"Bot initialized")
+            await self._bot_handler.initialize()
 
             tasks = [
                 asyncio.create_task(
@@ -299,7 +232,7 @@ class Dealer:
             if self._config_handler.run_bot_updates:
                 tasks += [
                     asyncio.create_task(
-                        self._listen_bot_updates(), name="_listen_bot_updates"
+                        self._bot_handler.watch(), name="bot_handler_watch"
                     )
                 ]
             tasks += [
@@ -326,7 +259,7 @@ class Dealer:
     async def close(self):
         tasks = [
             self._exchange_handler.close(),
-            self._bot.shutdown(),
+            self._bot_handler.close(),
             self._order_book_handler.close(),
         ]
         await asyncio.gather(*tasks)

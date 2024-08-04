@@ -11,7 +11,11 @@ DEFAULT_SYMBOLS = "BTC/USDT"
 class ConfigHandler:
     def __init__(self):
         self._bot_token = os.getenv("BOT_TOKEN")
-        self._bot_chat_id = os.getenv("BOT_CHAT_ID")
+        bot_chat_id = os.getenv("BOT_CHAT_ID")
+        try:
+            self._bot_chat_id = int(bot_chat_id)
+        except:
+            self._bot_chat_id = None
         self._symbols = os.getenv("SYMBOLS", DEFAULT_SYMBOLS).split(",")
         self._cache_endpoint = os.getenv("CACHE_ENDPOINT", DEFAULT_CACHE_ENDPOINT)
         expire_book_orders = os.getenv("EXPIRE_BOOK_ORDERS", DEFAULT_EXPIRE_BOOK_ORDERS)

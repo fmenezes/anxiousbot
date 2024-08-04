@@ -6,15 +6,17 @@ import ccxt.pro as ccxt
 from ccxt.base.exchange import Exchange
 
 from anxiousbot import exponential_backoff
+from anxiousbot.config_handler import ConfigHandler
 from anxiousbot.log import get_logger
 
 
 class ExchangeHandler:
-    def __init__(self):
+    def __init__(self, config_handler: ConfigHandler):
         self._exchanges = {}
         self._auth_exchanges = []
         self._logger = get_logger(__name__)
         self._loop = True
+        self._config_handler = config_handler
 
     def _credentials(self, exchange_id: str) -> Dict[str, str] | None:
         auth_keys = [
