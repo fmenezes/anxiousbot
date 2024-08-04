@@ -1,3 +1,5 @@
+import asyncio
+
 from telegram import Bot, Update
 
 from anxiousbot import exponential_backoff
@@ -20,6 +22,8 @@ class BotHandler:
         self._logger = get_logger(__name__)
         self._loop = True
         self._bot = Bot(self._config_handler.bot_token)
+        self._messages = []
+        self._lock = asyncio.Lock()
 
     async def initialize(self) -> None:
         await self._bot.initialize()
@@ -42,26 +46,60 @@ class BotHandler:
                         if value > 0:
                             msg += f"  {symbol} {value:.8f}\n"
 
-        await exponential_backoff(
-            self.send_message,
+        await self.enqueue_message(
             chat_id=update.effective_message.chat_id,
             text=msg,
+            priority=True,
         )
 
-    async def send_message(
-        self, text: str, chat_id: int | None = None, *args, **kwargs
+    async def enqueue_message(
+        self, text: str, chat_id: int | None = None, priority=False
     ) -> None:
-        await exponential_backoff(
-            self._bot.send_message,
-            chat_id=chat_id or self._config_handler.bot_chat_id,
-            text=text,
-            read_timeout=35,
-            write_timeout=35,
-            connect_timeout=35,
-            pool_timeout=35,
-        )
+        new_entry = {
+            "chat_id": (chat_id or self._config_handler.bot_chat_id),
+            "text": text,
+        }
+        async with self._lock:
+            if priority:
+                self._messages = [new_entry] + self._messages
+            else:
+                self._messages += [new_entry]
 
     async def watch(self) -> None:
+        tasks = [self._watch_process_messages()]
+
+        if self._config_handler.run_bot_updates:
+            tasks += [self._watch_updates()]
+        await asyncio.gather(*tasks)
+
+    async def _watch_process_messages(self) -> None:
+        while self._loop:
+            try:
+                async with self._lock:
+                    if len(self._messages) == 0:
+                        message = None
+                    else:
+                        message = self._messages[0]
+                        self._messages = self._messages[1:]
+                if message is None:
+                    await asyncio.sleep(1)
+                    continue
+                await exponential_backoff(
+                    self._bot.send_message,
+                    chat_id=message["chat_id"],
+                    text=message["text"],
+                    read_timeout=35,
+                    write_timeout=35,
+                    connect_timeout=35,
+                    pool_timeout=35,
+                )
+            except Exception as e:
+                self._logger.exception(
+                    f"An error occurred while dequeuing messages: [{type(e).__name__}] {str(e)}"
+                )
+                await asyncio.sleep(0.5)
+
+    async def _watch_updates(self) -> None:
         _last_update_id = await self._redis_handler.get_last_update_id()
 
         while self._loop:

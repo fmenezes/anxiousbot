@@ -3,7 +3,7 @@ import csv
 import os
 from datetime import datetime
 
-from anxiousbot import exponential_backoff, split_coin
+from anxiousbot import split_coin
 from anxiousbot.bot_handler import BotHandler
 from anxiousbot.config_handler import ConfigHandler
 from anxiousbot.deal import Deal
@@ -30,8 +30,6 @@ class Dealer:
             self._config_handler, self._redis_handler, trader_handler
         )
 
-        self._bot_events = []
-        self._bot_event_lock = asyncio.Lock()
         self._logger = get_logger(__name__)
 
     def _write_deal_xml(self, deal_event):
@@ -125,34 +123,16 @@ class Dealer:
                 {"type": "deal", **new_event},
             )
             self._write_deal_xml(new_event)
-            async with self._bot_event_lock:
-                self._bot_events += [new_event]
+            self._nofity_event(new_event)
 
-    async def _process_bot_events(self):
-        while True:
-            try:
-                async with self._bot_event_lock:
-                    if len(self._bot_events) == 0:
-                        event = None
-                    else:
-                        event = self._bot_events[0]
-                        self._bot_events = self._bot_events[1:]
-                if event is None:
-                    await asyncio.sleep(1)
-                    continue
-                if event["type"] not in ["close"]:
-                    continue
-                icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
-                msg = f"{icon} {event['message']}"
-                await exponential_backoff(
-                    self._bot_handler.send_message,
-                    text=msg,
-                )
-            except Exception as e:
-                self._logger.exception(
-                    f"An error occurred: [{type(e).__name__}] {str(e)}"
-                )
-                await asyncio.sleep(0.5)
+    async def _nofity_event(self, event):
+        if event["type"] not in ["close"]:
+            return
+        icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
+        msg = f"{icon} {event['message']}"
+        await self._bot_handler.enqueue_message(
+            text=msg,
+        )
 
     async def _watch_deals(self, symbol):
         while True:
@@ -221,12 +201,13 @@ class Dealer:
             await self._bot_handler.initialize()
 
             tasks = [
-                asyncio.create_task(
-                    self._process_bot_events(), name="_process_bot_events"
-                ),
                 asyncio.create_task(self._watch_balance(), name="_watch_balance"),
                 asyncio.create_task(
                     self._order_book_handler.watch(), name=f"order_book_handler_watch"
+                ),
+                asyncio.create_task(
+                    self._exchange_handler.setup_all_exchanges(),
+                    name=f"setup_all_exchanges",
                 ),
             ]
             if self._config_handler.run_bot_updates:
@@ -235,12 +216,6 @@ class Dealer:
                         self._bot_handler.watch(), name="bot_handler_watch"
                     )
                 ]
-            tasks += [
-                asyncio.create_task(
-                    self._exchange_handler.setup_all_exchanges(),
-                    name=f"setup_all_exchanges",
-                )
-            ]
             tasks += [
                 asyncio.create_task(
                     self._watch_deals(symbol), name=f"_watch_deals_{symbol}"
