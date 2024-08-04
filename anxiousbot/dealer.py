@@ -258,6 +258,7 @@ class Dealer:
 
     async def close(self):
         tasks = [
+            self._redis_handler.close(),
             self._exchange_handler.close(),
             self._bot_handler.close(),
             self._order_book_handler.close(),
