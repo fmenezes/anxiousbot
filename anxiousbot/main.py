@@ -5,7 +5,7 @@ from contextlib import aclosing
 
 from dotenv import load_dotenv
 
-from anxiousbot.dealer import Dealer
+from anxiousbot.app import App
 from anxiousbot.log import get_logger
 
 
@@ -30,8 +30,8 @@ async def _main():
     threading.excepthook = _thread_excepthook
     sys.excepthook = _sys_excepthook
 
-    async with aclosing(Dealer()) as service:
-        return await service.run()
+    async with aclosing(App()) as app:
+        return await app.run()
 
 
 if __name__ == "__main__":

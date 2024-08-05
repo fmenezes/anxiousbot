@@ -10,7 +10,7 @@ from anxiousbot.redis_handler import RedisHandler
 from anxiousbot.trader_handler import TraderHandler
 
 
-class Dealer:
+class App:
     def __init__(
         self,
     ):
