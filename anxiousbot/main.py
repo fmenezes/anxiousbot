@@ -8,8 +8,7 @@ from dotenv import load_dotenv
 from anxiousbot.app import App
 from anxiousbot.log import get_logger
 
-
-async def _main():
+async def _run():
     load_dotenv(override=True)
     logger = get_logger(name=__name__)
 
@@ -34,5 +33,8 @@ async def _main():
         return await app.run()
 
 
+def _main():
+    return asyncio.run(_run())
+
 if __name__ == "__main__":
-    exit(asyncio.run(_main()))
+    exit(_main())
