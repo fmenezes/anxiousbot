@@ -2,19 +2,21 @@ import asyncio
 import logging
 import os
 import traceback
+from typing import Any, Callable, Dict
 
+import boto3
 from watchtower import CloudWatchLogFormatter, CloudWatchLogHandler
 
 
 class CustomFormatter(CloudWatchLogFormatter):
-    def format(self, message):
+    def format(self, message: Any) -> str:
         for attr in self.add_log_record_attrs:
             if not hasattr(message, attr):
                 setattr(message, attr, None)
         return super().format(message)
 
 
-def _get_log_handler(extra=None):
+def _get_log_handler(extra: Dict[str, Any] | None = None) -> logging.Handler:
     attrs = [
         "name",
         "levelname",
@@ -43,11 +45,14 @@ def _get_log_handler(extra=None):
     return handler
 
 
-def _log_record_factory(log_factory=None, extra=None):
+def _log_record_factory(
+    log_factory: Callable[..., logging.LogRecord] | None = None,
+    extra: Dict[str, Any] | None = None,
+) -> Callable[..., logging.LogRecord]:
     if log_factory is None:
         log_factory = logging.getLogRecordFactory()
 
-    def _factory(*args, **kwargs):
+    def _factory(*args: Any, **kwargs: Dict[str, Any]) -> logging.LogRecord:
         record = log_factory(*args, **kwargs)
 
         if isinstance(record.exc_info, BaseException):
@@ -77,7 +82,9 @@ def _log_record_factory(log_factory=None, extra=None):
     return _factory
 
 
-def get_logger(name=None, extra=None):
+def get_logger(
+    name: str | None = None, extra: Dict[str, Any] | None = None
+) -> logging.Logger:
     logging.setLogRecordFactory(_log_record_factory(extra=extra))
     logger = logging.getLogger(name)
     try:

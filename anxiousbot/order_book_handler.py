@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from typing import Dict, Iterator, List
+from typing import Dict, Iterator
 
 from anxiousbot import exponential_backoff
 from anxiousbot.config_handler import ConfigHandler

@@ -1,24 +1,21 @@
 import asyncio
-from contextlib import asynccontextmanager
 from types import CoroutineType
+from typing import Any, Callable, Dict, List, Tuple, TypeVar
 
 from ccxt.base.errors import RateLimitExceeded
 from telegram.error import RetryAfter
 
 
-def split_coin(symbol):
+def split_coin(symbol: str) -> List[str]:
     return symbol.split("/")
 
 
-@asynccontextmanager
-async def closing(thing):
-    try:
-        yield thing
-    finally:
-        await thing.close()
+R = TypeVar("R")
 
 
-async def exponential_backoff(fn, *args, **kwargs):
+async def exponential_backoff(
+    fn: Callable[..., R], *args: Tuple, **kwargs: Dict[str, Any]
+) -> R:
     backoff = [1, 2, 4, 8]
     last_e = None
     for delay in backoff:

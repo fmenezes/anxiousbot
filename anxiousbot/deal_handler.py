@@ -2,6 +2,7 @@ import asyncio
 import csv
 import os
 from datetime import datetime
+from typing import Dict
 
 from anxiousbot import split_coin
 from anxiousbot.bot_handler import BotHandler
@@ -27,7 +28,7 @@ class DealHandler:
         self._loop = True
         self._logger = get_logger(__name__)
 
-    def _write_deal_xml(self, deal_event):
+    def _write_deal_xml(self, deal_event: Dict) -> None:
         if deal_event["type"] != "close":
             return
         file_name = os.path.abspath(
@@ -70,7 +71,7 @@ class DealHandler:
             ]
             w.writerow(row)
 
-    async def _process_deal(self, deal):
+    async def _process_deal(self, deal: Deal) -> None:
         current_event = await self._redis_handler.get_deal(
             deal.symbol, deal.buy_exchange.id, deal.sell_exchange.id
         )
@@ -120,7 +121,7 @@ class DealHandler:
             self._write_deal_xml(new_event)
             self._nofity_event(new_event)
 
-    async def _nofity_event(self, event):
+    async def _nofity_event(self, event: Dict) -> None:
         if event["type"] not in ["close"]:
             return
         icon = "\U0001F7E2" if event["type"] == "open" else "\U0001F534"
@@ -129,7 +130,7 @@ class DealHandler:
             text=msg,
         )
 
-    async def _watch_deals(self, symbol):
+    async def _watch_deals(self, symbol: str) -> None:
         while self._loop:
             try:
                 start = datetime.now()
