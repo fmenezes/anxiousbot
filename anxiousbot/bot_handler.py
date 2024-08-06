@@ -6,7 +6,7 @@ from anxiousbot import exponential_backoff
 from anxiousbot.config_handler import ConfigHandler
 from anxiousbot.log import get_logger
 from anxiousbot.redis_handler import RedisHandler
-from anxiousbot.trader_handler import TraderHandler
+from anxiousbot.trade_handler import TradeHandler
 
 
 class BotHandler:
@@ -14,7 +14,7 @@ class BotHandler:
         self,
         config_handler: ConfigHandler,
         redis_handler: RedisHandler,
-        trader_handler: TraderHandler,
+        trader_handler: TradeHandler,
     ):
         self._config_handler = config_handler
         self._redis_handler = redis_handler

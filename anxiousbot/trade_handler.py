@@ -4,7 +4,7 @@ from anxiousbot import exponential_backoff
 from anxiousbot.exchange_handler import ExchangeHandler
 
 
-class TraderHandler:
+class TradeHandler:
     def __init__(self, exchange_handler: ExchangeHandler):
         self._exchange_handler = exchange_handler
 

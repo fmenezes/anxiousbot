@@ -7,7 +7,7 @@ from anxiousbot.exchange_handler import ExchangeHandler
 from anxiousbot.log import get_logger
 from anxiousbot.order_book_handler import OrderBookHandler
 from anxiousbot.redis_handler import RedisHandler
-from anxiousbot.trader_handler import TraderHandler
+from anxiousbot.trade_handler import TradeHandler
 
 
 class App:
@@ -21,7 +21,7 @@ class App:
             self._config_handler, self._exchange_handler, self._redis_handler
         )
 
-        trader_handler = TraderHandler(self._exchange_handler)
+        trader_handler = TradeHandler(self._exchange_handler)
         self._bot_handler = BotHandler(
             self._config_handler, self._redis_handler, trader_handler
         )
