@@ -2,10 +2,14 @@ import json
 import os
 from typing import Dict
 
+ROLE_PRIMARY = "primary"
+ROLE_SECONDARY = "SECONDARY"
+
 DEFAULT_EXIPRE_DEAL_EVENTS = "60"
 DEFAULT_EXPIRE_BOOK_ORDERS = "60"
 DEFAULT_CACHE_ENDPOINT = "redis://localhost"
 DEFAULT_SYMBOLS = "BTC/USDT"
+DEFAULT_ROLE = ROLE_PRIMARY
 
 
 class ConfigHandler:
@@ -16,6 +20,7 @@ class ConfigHandler:
             self._bot_chat_id = int(bot_chat_id)
         except:
             self._bot_chat_id = None
+        self._role = os.getenv("ROLE", DEFAULT_ROLE)
         self._symbols = os.getenv("SYMBOLS", DEFAULT_SYMBOLS).split(",")
         self._cache_endpoint = os.getenv("CACHE_ENDPOINT", DEFAULT_CACHE_ENDPOINT)
         expire_book_orders = os.getenv("EXPIRE_BOOK_ORDERS", DEFAULT_EXPIRE_BOOK_ORDERS)
@@ -28,22 +33,17 @@ class ConfigHandler:
             self._expire_deal_events = int(expire_deal_events)
         except:
             self._expire_deal_events = int(DEFAULT_EXPIRE_BOOK_ORDERS)
-        run_bot_updates = os.getenv("RUN_BOT", "1")
-        self._run_bot_updates = run_bot_updates.lower() in [
-            "1",
-            "yes",
-            "y",
-            "true",
-            "t",
-        ]
         with open("./config/exchanges.json", "r") as f:
             self._exchanges_param = json.load(f)
         with open("./config/symbols.json", "r") as f:
             self._symbols_param = json.load(f)
 
     @property
-    def run_bot_updates(self):
-        return self._run_bot_updates
+    def role(self):
+        return self._role
+
+    def is_primary(self):
+        return self._role.lower() == ROLE_PRIMARY
 
     @property
     def bot_token(self):

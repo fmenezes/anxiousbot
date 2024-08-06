@@ -68,7 +68,7 @@ class BotHandler:
     async def watch(self) -> None:
         tasks = [self._watch_process_messages()]
 
-        if self._config_handler.run_bot_updates:
+        if self._config_handler.is_primary():
             tasks += [self._watch_updates()]
         await asyncio.gather(*tasks)
 

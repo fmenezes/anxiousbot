@@ -1,18 +1,23 @@
-provider "aws" {}
+provider "aws" {
+  region = "eu-west-1"
+}
 
 terraform {
   backend "s3" {
-    bucket         = "anxiousbot-main-bucket"
+    bucket         = "anxiousbot-bucket"
     key            = "terraform/terraform.tfstate"
     encrypt        = true
     dynamodb_table = "terraform-locks-table"
-    region         = "us-east-1"
+    region         = "eu-west-1"
   }
 }
 
+# fixed ip
+data "aws_eip" "primary_server_ip" { }
+
 # S3 Bucket
 data "aws_s3_bucket" "main" {
-  bucket = "anxiousbot-main-bucket"
+  bucket = "anxiousbot-bucket"
 }
 
 # VPC
@@ -31,7 +36,7 @@ resource "aws_vpc" "main" {
 resource "aws_subnet" "main" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.1.0/24"
-  availability_zone = "us-east-1a"
+  availability_zone = "eu-west-1a"
 
   tags = {
     Name    = "anxiousbot-main-subnet"
@@ -261,10 +266,27 @@ locals {
   config = jsondecode(file("../../config/instances.json"))
 }
 
+data "aws_ami" "amazon_linux_2023" {
+  most_recent = true
+  owners      = ["amazon"]
+  filter {
+    name   = "owner-alias"
+    values = ["amazon"]
+  }
+  filter {
+    name = "name"
+    values = ["al2023-ami-*"]
+  }
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
+  }
+}
+
 # EC2 Instance
 resource "aws_instance" "server" {
   count                       = length(local.config)
-  ami                         = "ami-01b799c439fd5516a"
+  ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = "t2.medium"
   subnet_id                   = aws_subnet.main.id
   vpc_security_group_ids      = [aws_security_group.allow_ssh.id]
@@ -276,14 +298,21 @@ resource "aws_instance" "server" {
     #!/bin/bash
     mkdir -p /etc/anxiousbot
     echo 'S3BUCKET="${data.aws_s3_bucket.main.bucket}"' >> /etc/anxiousbot/.env
+    echo 'ROLE="${count.index == 0 ? "primary" : "secondary"}"' >> /etc/anxiousbot/.env
     echo 'SYMBOLS="${local.config[count.index]}"' >> /etc/anxiousbot/.env
     echo 'CACHE_ENDPOINT="redis://${aws_elasticache_replication_group.cache_cluster_group.primary_endpoint_address}:${aws_elasticache_replication_group.cache_cluster_group.port == null ? 6379 : aws_elasticache_replication_group.cache_cluster_group.port}"' >> /etc/anxiousbot/.env
   EOF
 
   tags = {
     Name    = "anxiousbot-${count.index}"
+    Role    = count.index == 0 ? "primary" : "secondary"
     Project = "anxiousbot"
   }
+}
+
+resource "aws_eip_association" "eip_assoc" {
+  instance_id   = aws_instance.server[0].id
+  allocation_id = data.aws_eip.primary_server_ip.id
 }
 
 output "instance_ids" {

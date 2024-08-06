@@ -150,7 +150,6 @@
       blockinfile:
         path: /opt/anxiousbot/.env
         block: |
-          RUN_BOT=0
           DEALS_FILE_PREFIX={{ ansible_ec2_instance_id }}_
           AWS_REGION={{ ansible_ec2_placement_region }}
           LOG_LEVEL=DEBUG
@@ -178,13 +177,6 @@
           COINBASE_SECRET={{ coinbase_secret }}
         create: yes
         marker: ""
-
-    - name: set RUN_BOT in .env
-      lineinfile:
-        path: /opt/anxiousbot/.env
-        line: RUN_BOT=1
-        search_string: RUN_BOT=0
-      run_once: true
 
     - name: Enable and start CloudWatch Agent service
       systemd:
