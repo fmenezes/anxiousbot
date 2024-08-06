@@ -121,7 +121,7 @@ class ExchangeHandler:
         if exchange_id not in self._exchanges:
             return
         await self._exchanges.get(exchange_id).close()
-        del self._exchange[exchange_id]
+        del self._exchanges[exchange_id]
         self._auth_exchanges = [id for id in self._auth_exchanges if id != exchange_id]
 
     async def aclose(self):
