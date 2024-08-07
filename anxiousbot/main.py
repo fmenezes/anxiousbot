@@ -31,6 +31,7 @@ def _main() -> None:
     load_dotenv(override=True)
 
     logger = get_logger(name=__name__)
+
     def _sys_excepthook(exc_type, exc_value, exc_traceback):
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)

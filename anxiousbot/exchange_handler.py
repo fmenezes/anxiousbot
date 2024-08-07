@@ -3,7 +3,7 @@ import os
 from typing import Dict, List
 
 import ccxt.pro as ccxt
-from ccxt.base.exchange import Exchange
+from ccxt.async_support.base.exchange import Exchange
 
 from anxiousbot import exponential_backoff
 from anxiousbot.config_handler import ConfigHandler

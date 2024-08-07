@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Literal
 
 from anxiousbot import exponential_backoff
 from anxiousbot.exchange_handler import ExchangeHandler
@@ -23,3 +23,11 @@ class TradeHandler:
                 balances[exchange_id] = {"status": "ERROR", "exception": e}
 
         return balances
+
+    async def trade(
+        self, exchange_id: str, symbol: str, side: Literal["buy", "sell"], volume: float
+    ) -> None:
+        client = self._exchange_handler.exchange(exchange_id)
+        if client is None:
+            raise RuntimeError(f"exchange {exchange_id} not available")
+        await client.create_order(symbol, "market", side, volume)
