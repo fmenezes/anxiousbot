@@ -20,6 +20,17 @@ def _run_bot_app(logger: logging.Logger) -> None:
 
 
 def _run_dealer_app(logger: logging.Logger) -> None:
+    while True:
+        try:
+            DealerApp.run()
+        except:
+            logger.exception("error while running dealer app")
+
+
+def _main() -> None:
+    load_dotenv(override=True)
+
+    logger = get_logger(name=__name__)
     def _sys_excepthook(exc_type, exc_value, exc_traceback):
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
@@ -36,16 +47,7 @@ def _run_dealer_app(logger: logging.Logger) -> None:
 
     threading.excepthook = _thread_excepthook
     sys.excepthook = _sys_excepthook
-    while True:
-        try:
-            DealerApp.run()
-        except:
-            logger.exception("error while running dealer app")
 
-
-def _main():
-    load_dotenv(override=True)
-    logger = get_logger(name=__name__)
     if os.getenv("ROLE", "primary") != "primary":
         return _run_dealer_app(logger)
 
@@ -60,4 +62,4 @@ def _main():
 
 
 if __name__ == "__main__":
-    exit(_main())
+    _main()
