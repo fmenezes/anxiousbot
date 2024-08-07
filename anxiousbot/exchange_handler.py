@@ -50,13 +50,23 @@ class ExchangeHandler:
 
         return auth
 
-    async def setup_all_exchanges(self) -> List[Exchange]:
+    async def setup_available_exchanges(self) -> List[Exchange]:
         tasks = [
             asyncio.create_task(
                 self.setup_exchange(id),
                 name=f"setup_exchange_{id}",
             )
             for id in self.available_ids()
+        ]
+        return await asyncio.gather(*tasks)
+
+    async def setup_loggedin_exchanges(self) -> List[Exchange]:
+        tasks = [
+            asyncio.create_task(
+                self.setup_exchange(id),
+                name=f"setup_exchange_{id}",
+            )
+            for id in self.authenticated_ids()
         ]
         return await asyncio.gather(*tasks)
 
@@ -110,6 +120,18 @@ class ExchangeHandler:
                 ]
             )
         )
+
+    def all_ids(self) -> List[str]:
+        ids = [
+            id
+            for id in ccxt.exchanges
+            if not getattr(ccxt, id)().describe().get("alias", False)
+        ]
+        return ids
+
+    def authenticated_ids(self) -> List[str]:
+        ids = [id for id in self.all_ids() if self._credentials(id) is not None]
+        return ids
 
     def exchange(self, id: str) -> Exchange | None:
         return self._exchanges.get(id)
