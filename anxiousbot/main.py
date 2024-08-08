@@ -1,6 +1,7 @@
 import logging
 import multiprocessing
 import os
+import signal
 import sys
 import threading
 
@@ -10,9 +11,11 @@ from anxiousbot.bot_app import App as BotApp
 from anxiousbot.dealer_app import App as DealerApp
 from anxiousbot.log import get_logger
 
+_loop = True
+
 
 def _run_bot_app(logger: logging.Logger) -> None:
-    while True:
+    while _loop:
         try:
             BotApp.run()
         except:
@@ -20,7 +23,7 @@ def _run_bot_app(logger: logging.Logger) -> None:
 
 
 def _run_dealer_app(logger: logging.Logger) -> None:
-    while True:
+    while _loop:
         try:
             DealerApp.run()
         except:
@@ -56,6 +59,15 @@ def _main() -> None:
         multiprocessing.Process(target=_run_dealer_app, args=[logger]),
         multiprocessing.Process(target=_run_bot_app, args=[logger]),
     ]
+
+    def signal_handler(sig, frame):
+        global _loop
+        _loop = False
+        for p in processes:
+            p.kill()
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     for p in processes:
         p.start()
     for p in processes:
