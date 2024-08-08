@@ -35,7 +35,7 @@ class App:
         self._logger = get_logger(__name__)
         self._config_handler = ConfigHandler()
         self._exchange_handler = ExchangeHandler(self._config_handler)
-        self._trade_handler = TradeHandler(self._exchange_handler)
+        self._trade_handler = TradeHandler(self._config_handler, self._exchange_handler)
 
     async def _set_bot_settings(self, app: Application) -> None:
         await app.bot.set_my_commands(
@@ -104,13 +104,12 @@ class App:
         )
         app.add_handler(CommandHandler("balance", self._handle_balance))
 
-    def _valid_exchanges(self) -> List[str]:
-        return self._exchange_handler.authenticated_ids()
-
     def _exchange_markup(
         self, *args: Tuple, **kwargs: Dict[str, Any]
     ) -> ReplyKeyboardMarkup:
-        buttons = [KeyboardButton(id) for id in self._valid_exchanges()]
+        buttons = [
+            KeyboardButton(id) for id in self._trade_handler.valid_exchange_ids()
+        ]
         rows = []
         while len(buttons) > 0:
             rows += [buttons[0:3]]
@@ -124,14 +123,11 @@ class App:
             **kwargs,
         )
 
-    def _valid_sides(self) -> List[str]:
-        return ["buy", "sell"]
-
     def _side_markup(
         self, *args: Tuple, **kwargs: Dict[str, Any]
     ) -> ReplyKeyboardMarkup:
         return ReplyKeyboardMarkup(
-            [[KeyboardButton(entry) for entry in self._valid_sides()]],
+            [[KeyboardButton(entry) for entry in self._trade_handler.valid_sides()]],
             resize_keyboard=True,
             one_time_keyboard=True,
             selective=True,
@@ -153,7 +149,7 @@ class App:
         if update.effective_message.text == "/cancel":
             return await self._handle_trade_cancel(update, context)
         self._input_exchange = update.effective_message.text
-        if self._input_exchange not in self._valid_exchanges():
+        if self._input_exchange not in self._trade_handler.valid_exchange_ids():
             await update.effective_message.reply_text(
                 f"Exchange {self._input_exchange} invalid. Which exchange would you like to trade?",
                 reply_to_message_id=update.effective_message.id,
@@ -174,7 +170,7 @@ class App:
         if update.effective_message.text == "/cancel":
             return await self._handle_trade_cancel(update, context)
         self._input_symbol = update.effective_message.text
-        if self._input_symbol not in self._config_handler.symbols_param.keys():
+        if self._input_symbol not in self._trade_handler.valid_symbols():
             await update.effective_message.reply_text(
                 f"Symbol {self._input_symbol} is invalid. Which symbol would you like to trade?",
                 reply_to_message_id=update.effective_message.id,
@@ -194,7 +190,7 @@ class App:
         if update.effective_message.text == "/cancel":
             return await self._handle_trade_cancel(update, context)
         self._input_side = update.effective_message.text
-        if self._input_side not in ["buy", "sell"]:
+        if self._input_side not in self._trade_handler.valid_sides():
             await update.effective_message.reply_text(
                 f"Side {self._input_side} is invalid. Which side would you like to trade?",
                 reply_to_message_id=update.effective_message.id,
@@ -275,27 +271,13 @@ class App:
         )
         return TRANSFER_STATE_ASK_VOLUME
 
-    def _valid_coins(self) -> List[str]:
-        return list(
-            set(
-                [
-                    param["basecoin"]
-                    for symbol, param in self._config_handler.symbols_param.items()
-                ]
-                + [
-                    param["quotecoin"]
-                    for symbol, param in self._config_handler.symbols_param.items()
-                ]
-            )
-        )
-
     async def _handle_transfer_ask_volume(
         self, update: Update, context: CallbackContext
     ) -> int:
         if update.effective_message.text == "/cancel":
             return await self._handle_transfer_cancel(update, context)
         self._input_coin = update.effective_message.text
-        if self._input_coin not in self._valid_coins():
+        if self._input_coin not in self._trade_handler.valid_coins():
             await update.effective_message.reply_text(
                 f"Coin {self._input_coin} is invalid. Which coin would you like to transfer?",
                 reply_to_message_id=update.effective_message.id,
@@ -337,7 +319,7 @@ class App:
         if update.effective_message.text == "/cancel":
             return await self._handle_transfer_cancel(update, context)
         self._input_exchange_from = update.effective_message.text
-        if self._input_exchange_from not in self._valid_exchanges():
+        if self._input_exchange_from not in self._trade_handler.valid_exchange_ids():
             await update.effective_message.reply_text(
                 f"Exchange {self._input_exchange_from} is invalid. Which exchange would you like to transfer from?",
                 reply_to_message_id=update.effective_message.id,
@@ -357,7 +339,7 @@ class App:
         if update.effective_message.text == "/cancel":
             return await self._handle_transfer_cancel(update, context)
         self._input_exchange_to = update.effective_message.text
-        if self._input_exchange_to not in self._valid_exchanges():
+        if self._input_exchange_to not in self._trade_handler.valid_exchange_ids():
             await update.effective_message.reply_text(
                 f"Exchange {self._input_exchange_to} is invalid. Which exchange would you like to transfer to?",
                 reply_to_message_id=update.effective_message.id,
@@ -373,25 +355,12 @@ class App:
         )
         return TRANSFER_STATE_END
 
-    def _valid_networks(self, coin: str, exchange_ids: List[str]) -> List[str]:
-        clients = [self._exchange_handler.exchange(id) for id in exchange_ids]
-        networks = {}
-        for client in clients:
-            currency = client.currencies.get(coin)
-            if currency is None:
-                return []
-            for network in currency["networks"].keys():
-                if network not in networks:
-                    networks[network] = 1
-                else:
-                    networks[network] += 1
-        return [key for key, value in networks.items() if value > 1]
-
     def _network_markup(
         self, coin: str, exchange_ids: List[str], *args: Tuple, **kwargs: Dict[str, Any]
     ) -> ReplyKeyboardMarkup:
         buttons = [
-            KeyboardButton(id) for id in self._valid_networks(coin, exchange_ids)
+            KeyboardButton(id)
+            for id in self._trade_handler.valid_network_ids(coin, exchange_ids)
         ]
         rows = []
         while len(buttons) > 0:
@@ -412,7 +381,7 @@ class App:
         if update.effective_message.text == "/cancel":
             return await self._handle_transfer_cancel(update, context)
         self._input_network = update.effective_message.text
-        if self._input_network not in self._valid_networks(
+        if self._input_network not in self._trade_handler.valid_network_ids(
             self._input_coin, [self._input_exchange_from, self._input_exchange_to]
         ):
             await update.effective_message.reply_text(
