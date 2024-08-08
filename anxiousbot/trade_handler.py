@@ -31,3 +31,22 @@ class TradeHandler:
         if client is None:
             raise RuntimeError(f"exchange {exchange_id} not available")
         await client.create_order(symbol, "market", side, volume)
+
+    async def transfer(
+        self,
+        coin: str,
+        volume: float,
+        from_exchange_id: str,
+        to_exchange_id: str,
+        network: str,
+    ) -> None:
+        from_client = self._exchange_handler.exchange(from_exchange_id)
+        if from_client is None:
+            raise RuntimeError(f"exchange {from_exchange_id} not available")
+        to_client = self._exchange_handler.exchange(to_exchange_id)
+        if to_client is None:
+            raise RuntimeError(f"exchange {to_exchange_id} not available")
+        address = await to_client.fetch_deposit_address(coin, {"network": network})
+        await from_client.withdraw(
+            coin, volume, address["address"], params={"network": network}
+        )
