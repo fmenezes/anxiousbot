@@ -110,7 +110,12 @@ class TradeHandler:
         to_client = self._exchange_handler.exchange(to_exchange_id)
         if to_client is None:
             raise TradeException(f"exchange {to_exchange_id} not available")
-        address = await to_client.fetch_deposit_address(coin, {"network": network})
+        try:
+            address = await to_client.fetch_deposit_address(coin, {"network": network})
+        except:
+            address = None
+        if address is None:
+            address = await to_client.create_deposit_address(coin, {"network": network})
         await from_client.withdraw(
             coin,
             volume,

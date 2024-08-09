@@ -232,6 +232,7 @@ class App:
                 f"Trade {self._input_side} {self._input_volume} {self._input_symbol} at {self._input_exchange} completed."
             )
         except Exception as e:
+            self._logger.exception("error trading")
             await message.edit_text(f"Error trading [{type(e).__name__}] {e}.")
         return ConversationHandler.END
 
@@ -244,6 +245,9 @@ class App:
         return ConversationHandler.END
 
     async def _handle_balance(self, update: Update, context: CallbackContext) -> None:
+        message = await update.effective_message.reply_text(
+            "fetching balance...", reply_to_message_id=update.effective_message.id
+        )
         result = await self._trade_handler.fetch_balance()
         msg = ""
         for exchange_id, data in result.items():
@@ -259,9 +263,7 @@ class App:
                             msg += f"  {symbol} {value:.8f}\n"
         if msg == "":
             msg = "No balance available"
-        await update.effective_message.reply_text(
-            msg, reply_to_message_id=update.effective_message.id
-        )
+        await message.edit_text(msg)
 
     async def _handle_transfer(self, update: Update, context: CallbackContext) -> int:
         await update.effective_message.reply_text(
@@ -409,6 +411,7 @@ class App:
                 f"Transfer {self._input_volume} {self._input_coin} from {self._input_exchange_from} at {self._input_exchange_to} via {self._input_network} complete"
             )
         except Exception as e:
+            self._logger.exception("error transfering")
             await message.edit_text(f"Error transfering [{type(e).__name__}] {e}.")
         return ConversationHandler.END
 
