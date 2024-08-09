@@ -32,7 +32,7 @@ class DealHandler:
         if deal_event["type"] != "close":
             return
         file_name = os.path.abspath(
-            f"data/{os.getenv('DEALS_FILE_PREFIX')}deals_{deal_event['symbol'].replace('/', '-')}_{datetime.fromisoformat(deal_event['ts']).strftime('%Y-%m-%d')}.csv"
+            f"data/{os.getenv('DEALS_FILE_PREFIX', '')}deals_{deal_event['symbol'].replace('/', '-')}_{datetime.fromisoformat(deal_event['ts']).strftime('%Y-%m-%d')}.csv"
         )
         print_header = not os.path.exists(file_name)
         with open(file_name, "a") as f:
