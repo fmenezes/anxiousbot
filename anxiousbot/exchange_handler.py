@@ -74,7 +74,10 @@ class ExchangeHandler:
         if exchange_id in self._exchanges:
             return self._exchanges[exchange_id]
 
-        auth = self._credentials(exchange_id)
+        if self._config_handler.is_primary():
+            auth = self._credentials(exchange_id)
+        else:
+            auth = None
         client_cls = getattr(ccxt, exchange_id)
         if auth is not None:
             client = client_cls(auth)
