@@ -112,5 +112,9 @@ class TradeHandler:
             raise TradeException(f"exchange {to_exchange_id} not available")
         address = await to_client.fetch_deposit_address(coin, {"network": network})
         await from_client.withdraw(
-            coin, volume, address["address"], address["tag"], params={"network": network}
+            coin,
+            volume,
+            address["address"],
+            address["tag"],
+            params={"network": network},
         )

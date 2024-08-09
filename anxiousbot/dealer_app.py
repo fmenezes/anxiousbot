@@ -45,7 +45,7 @@ class App:
                     self._order_book_handler.watch(), name=f"order_book_handler_watch"
                 ),
                 asyncio.create_task(
-                    self._exchange_handler.setup_available_exchanges(),
+                    self._exchange_handler.setup_available_exchanges(login=False),
                     name=f"setup_all_exchanges",
                 ),
                 asyncio.create_task(

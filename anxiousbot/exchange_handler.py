@@ -50,10 +50,10 @@ class ExchangeHandler:
 
         return auth
 
-    async def setup_available_exchanges(self) -> List[Exchange]:
+    async def setup_available_exchanges(self, login: bool = True) -> List[Exchange]:
         tasks = [
             asyncio.create_task(
-                self.setup_exchange(id),
+                self.setup_exchange(id, login),
                 name=f"setup_exchange_{id}",
             )
             for id in self.available_ids()
@@ -70,11 +70,11 @@ class ExchangeHandler:
         ]
         return await asyncio.gather(*tasks)
 
-    async def setup_exchange(self, exchange_id: str) -> Exchange:
+    async def setup_exchange(self, exchange_id: str, login: bool = True) -> Exchange:
         if exchange_id in self._exchanges:
             return self._exchanges[exchange_id]
 
-        if self._config_handler.is_primary():
+        if login:
             auth = self._credentials(exchange_id)
         else:
             auth = None
