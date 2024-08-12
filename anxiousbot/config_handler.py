@@ -33,10 +33,8 @@ class ConfigHandler:
             self._expire_deal_events = int(expire_deal_events)
         except:
             self._expire_deal_events = int(DEFAULT_EXPIRE_BOOK_ORDERS)
-        with open("./config/exchanges.json", "r") as f:
-            self._exchanges_param = json.load(f)
-        with open("./config/symbols.json", "r") as f:
-            self._symbols_param = json.load(f)
+        with open("./config/parameters.json", "r") as f:
+            self._parameters = json.load(f)
 
     @property
     def role(self):
@@ -71,8 +69,12 @@ class ConfigHandler:
 
     @property
     def exchanges_param(self) -> Dict:
-        return self._exchanges_param
+        return self.parameters["exchanges"]
 
     @property
     def symbols_param(self) -> Dict:
-        return self._symbols_param
+        return self.parameters["symbols"]
+
+    @property
+    def parameters(self) -> Dict:
+        return self._parameters

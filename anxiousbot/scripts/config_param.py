@@ -71,6 +71,7 @@ async def _process_exchange(exchange):
         },
         "method": "fetch_order_book",
         "symbols": [],
+        "symbol_trios": [],
         "limit": _limit(client.id),
     }
     try:
@@ -82,6 +83,7 @@ async def _process_exchange(exchange):
                 if value["spot"] == True and value["active"] == True
             ]
         )
+        data["symbols"].sort()
         all_methods = [
             "fetchOrderBooks",
             "fetch_order_books",
@@ -122,6 +124,17 @@ async def _process_exchange(exchange):
             data["mode"] = "batch"
         if data["method"] in single_methods:
             data["mode"] = "single"
+        if len(data["symbols"]) > 0:
+            for lside, lsymbol, mside, msymbol, rside, rsymbol in find_trios(
+                data["symbols"]
+            ):
+                data["symbol_trios"] += [
+                    [
+                        {"side": lside, "symbol": lsymbol},
+                        {"side": mside, "symbol": msymbol},
+                        {"side": rside, "symbol": rsymbol},
+                    ]
+                ]
     except Exception as e:
         return None
     finally:
@@ -166,6 +179,52 @@ def _all_symbols(data):
     return symbols
 
 
+def matcher_coin(symbol, side, inverse=False):
+    base, quote = symbol.split("/")
+    if side == "buy":
+        if inverse:
+            return quote
+        else:
+            return base
+    else:
+        if inverse:
+            return base
+        else:
+            return quote
+
+
+def find_lsymbols(symbols):
+    sides = ["buy", "sell"]
+    for lsymbol in symbols:
+        for lside in sides:
+            yield lside, lsymbol
+
+
+def find_msymbols(symbols, data):
+    for lside, lsymbol in data:
+        lcoin = matcher_coin(lsymbol, lside)
+        for msymbol in [symbol for symbol in symbols if symbol.startswith(lcoin + "/")]:
+            yield lside, lsymbol, "sell", msymbol
+        for msymbol in [symbol for symbol in symbols if symbol.endswith("/" + lcoin)]:
+            yield lside, lsymbol, "buy", msymbol
+
+
+def find_rsymbols(symbols, data):
+    for lside, lsymbol, mside, msymbol in data:
+        startcoin = matcher_coin(lsymbol, lside, True)
+        mcoin = matcher_coin(msymbol, mside)
+        rsymbol = f"{startcoin}/{mcoin}"
+        if rsymbol in symbols:
+            yield lside, lsymbol, mside, msymbol, "buy", rsymbol
+        rsymbol = f"{mcoin}/{startcoin}"
+        if rsymbol in symbols:
+            yield lside, lsymbol, mside, msymbol, "sell", rsymbol
+
+
+def find_trios(symbols):
+    return find_rsymbols(symbols, find_msymbols(symbols, find_lsymbols(symbols)))
+
+
 async def _run():
     exchanges = [
         exchange
@@ -189,13 +248,25 @@ async def _run():
 
     data = await asyncio.gather(*tasks)
     data = [entry for entry in data if entry is not None and len(entry["symbols"]) > 0]
+    exchange_list = _convert(data, "exchange")
+    parameters = {"exchanges": exchange_list}
+    symbol_list = _all_symbols(
+        [
+            {
+                "exchange": entry["exchange"],
+                "symbols": entry["symbols"],
+            }
+            for entry in data
+        ]
+    )
+    symbol_list = _convert(symbol_list, "symbol")
+    parameters["symbols"] = symbol_list
     with open(f"./config/exchanges.json", "w") as f:
-        json.dump(_convert(data, "exchange"), fp=f, indent=2)
-    for entry in data:
-        del entry["describe"]
-    symbol_list = _all_symbols(data)
+        json.dump(parameters["exchanges"], fp=f, indent=2, sort_keys=True)
     with open(f"./config/symbols.json", "w") as f:
-        json.dump(_convert(symbol_list, "symbol"), fp=f, indent=2)
+        json.dump(parameters["symbols"], fp=f, indent=2, sort_keys=True)
+    with open(f"./config/parameters.json", "w") as f:
+        json.dump(parameters, fp=f, indent=2, sort_keys=True)
 
 
 def _main():
