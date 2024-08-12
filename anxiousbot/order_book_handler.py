@@ -89,13 +89,13 @@ class OrderBookHandler:
                         },
                     )
 
-                if 'asks' in order_book or 'bids' in order_book:
+                if "asks" in order_book or "bids" in order_book:
                     await update_order_book(order_book, order_book["symbol"])
                 else:
                     for symbol, order in order_book.items():
                         if symbol in self._config_handler.symbols:
                             await update_order_book(order, symbol)
-                    
+
             except Exception as e:
                 self._logger.exception(e, extra={"exchange": exchange_id})
             await asyncio.sleep(1)

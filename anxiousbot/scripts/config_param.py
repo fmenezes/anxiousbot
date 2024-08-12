@@ -261,10 +261,6 @@ async def _run():
     )
     symbol_list = _convert(symbol_list, "symbol")
     parameters["symbols"] = symbol_list
-    with open(f"./config/exchanges.json", "w") as f:
-        json.dump(parameters["exchanges"], fp=f, indent=2, sort_keys=True)
-    with open(f"./config/symbols.json", "w") as f:
-        json.dump(parameters["symbols"], fp=f, indent=2, sort_keys=True)
     with open(f"./config/parameters.json", "w") as f:
         json.dump(parameters, fp=f, indent=2, sort_keys=True)
 

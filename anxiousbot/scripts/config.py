@@ -1,8 +1,6 @@
 import asyncio
 import copy
 import json
-import os
-from glob import glob
 
 from dotenv import load_dotenv
 
