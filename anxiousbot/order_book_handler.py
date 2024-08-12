@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime
-from typing import Dict, Iterator
+from typing import Dict, Iterator, Literal
 
 from anxiousbot import exponential_backoff
 from anxiousbot.config_handler import ConfigHandler
@@ -46,9 +46,14 @@ class OrderBookHandler:
                     for symbol in setting["symbols"]:
                         yield {**setting, "symbols": [symbol]}
 
-    async def _watch_order_book(self, setting: Dict) -> None:
+    async def _watch_order_book(
+        self,
+        exchange_id: str,
+        symbols: Iterator[str],
+        mode: Literal["single", "batch", "all"],
+    ) -> None:
         while self._loop:
-            client = self._exchange_handler.exchange(setting["exchange"])
+            client = self._exchange_handler.exchange(exchange_id)
             if client is None:
                 await asyncio.sleep(0.5)
                 continue
@@ -56,8 +61,8 @@ class OrderBookHandler:
         while self._loop:
             try:
                 start = datetime.now()
-                param = setting["symbols"]
-                match setting["mode"]:
+                param = symbols
+                match mode:
                     case "single":
                         await asyncio.sleep(0.5)
                         order_book = await exponential_backoff(
@@ -72,26 +77,32 @@ class OrderBookHandler:
 
                 async def update_order_book(order_book, symbol):
                     await self._redis_handler.set_order_book(
-                        symbol, setting["exchange"], order_book
+                        symbol, exchange_id, order_book
                     )
                     duration = str(datetime.now() - start)
                     self._logger.debug(
-                        f"Updated {setting['exchange']} in {duration}",
+                        f"Updated {exchange_id} in {duration}",
                         extra={
-                            "exchange": setting["exchange"],
+                            "exchange": exchange_id,
                             "duration": duration,
                             "symbol": symbol,
                         },
                     )
 
-                if setting["mode"] == "all" or setting["mode"] == "batch":
+                def update_per_symbol(order_book):
+                    for symbol in self._config_handler.symbols:
+                        if hasattr(order_book, symbol):
+                            return True
+                    return False
+
+                if update_per_symbol(order_book):
                     for symbol, order in order_book.items():
                         if symbol in self._config_handler.symbols:
                             await update_order_book(order, symbol)
                 else:
                     await update_order_book(order_book, order_book["symbol"])
             except Exception as e:
-                self._logger.exception(e, extra={"exchange": setting["exchange"]})
+                self._logger.exception(e, extra={"exchange": exchange_id})
             await asyncio.sleep(1)
 
     async def aclose(self) -> None:
@@ -104,7 +115,12 @@ class OrderBookHandler:
             if setting["mode"] == "single":
                 task_name += f"_{setting['symbols'][0]}"
             tasks += [
-                asyncio.create_task(self._watch_order_book(setting), name=task_name)
+                asyncio.create_task(
+                    self._watch_order_book(
+                        setting["exchange"], setting["symbols"], setting["mode"]
+                    ),
+                    name=task_name,
+                )
             ]
 
         return await asyncio.gather(*tasks)
