@@ -119,7 +119,7 @@ class DealHandler:
                 {"type": "deal", **new_event},
             )
             self._write_deal_xml(new_event)
-            self._nofity_event(new_event)
+            await self._nofity_event(new_event)
 
     async def _nofity_event(self, event: Dict) -> None:
         if event["type"] not in ["close"]:
