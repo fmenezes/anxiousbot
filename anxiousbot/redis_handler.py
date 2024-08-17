@@ -37,11 +37,45 @@ class RedisHandler:
             ex=self._config_handler.expire_deal_events,
         )
 
+    async def get_trio_deal_event(self, event: Dict) -> Dict:
+        key = "/trio_deal/" + "/".join(
+            [
+                f"{operation["exchange"]}_{operation["side"]}_{operation["symbol"]}"
+                for operation in event["operations"]
+            ]
+        )
+        return await self._get(key) or {
+            "ts_open": str(datetime.now()),
+            "type": "noop",
+            "threshold": False,
+        }
+
+    async def set_trio_deal_event(self, event: Dict) -> None:
+        key = "/trio_deal/" + "/".join(
+            [
+                f"{operation["exchange"]}_{operation["side"]}_{operation["symbol"]}"
+                for operation in event["operations"]
+            ]
+        )
+        await self._set(
+            key,
+            event,
+            ex=self._config_handler.expire_deal_events,
+        )
+
     async def get_balance(self, coin: str) -> float:
         return await self._get(f"/balance/{coin}") or 0.0
 
     async def set_balance(self, coin: str, value: float) -> None:
         await self._set(f"/balance/{coin}", value)
+
+    async def get_exchange_balance(self, exchange: str) -> Dict[str, float]:
+        return await self._get(f"/ebalance/{exchange}") or 0.0
+
+    async def set_exchange_balance(
+        self, exchange: str, value: Dict[str, float]
+    ) -> None:
+        await self._set(f"/ebalance/{exchange}", value)
 
     async def get_order_book(self, symbol: str, exchange_id: str) -> Dict | None:
         return await self._get(f"/order_book/{symbol}/{exchange_id}")
@@ -49,6 +83,16 @@ class RedisHandler:
     async def set_order_book(self, symbol: str, exchange_id: str, value: Dict) -> None:
         await self._set(
             f"/order_book/{symbol}/{exchange_id}",
+            value,
+            ex=self._config_handler.expire_book_orders,
+        )
+
+    async def get_ticker(self, symbol: str, exchange_id: str) -> Dict | None:
+        return await self._get(f"/ticker/{symbol}/{exchange_id}")
+
+    async def set_ticker(self, symbol: str, exchange_id: str, value: Dict) -> None:
+        await self._set(
+            f"/ticker/{symbol}/{exchange_id}",
             value,
             ex=self._config_handler.expire_book_orders,
         )

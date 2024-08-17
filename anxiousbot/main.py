@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from anxiousbot.bot_app import App as BotApp
 from anxiousbot.dealer_app import App as DealerApp
 from anxiousbot.log import get_logger
+from anxiousbot.trio_dealer_app import App as TrioDealerApp
 
 _loop = True
 
@@ -26,6 +27,14 @@ def _run_dealer_app(logger: logging.Logger) -> None:
     while _loop:
         try:
             DealerApp.run()
+        except:
+            logger.exception("error while running dealer app")
+
+
+def _run_trio_dealer_app(logger: logging.Logger) -> None:
+    while _loop:
+        try:
+            TrioDealerApp.run()
         except:
             logger.exception("error while running dealer app")
 
@@ -53,12 +62,20 @@ def _main() -> None:
     sys.excepthook = _sys_excepthook
 
     if os.getenv("ROLE", "primary") != "primary":
+        if os.getenv("APP", "duo") != "duo":
+            return _run_trio_dealer_app(logger)
         return _run_dealer_app(logger)
 
     processes = [
-        multiprocessing.Process(target=_run_dealer_app, args=[logger]),
         multiprocessing.Process(target=_run_bot_app, args=[logger]),
     ]
+
+    if os.getenv("APP", "duo") != "duo":
+        processes += [
+            multiprocessing.Process(target=_run_trio_dealer_app, args=[logger])
+        ]
+    else:
+        processes += multiprocessing.Process(target=_run_dealer_app, args=[logger])
 
     def signal_handler(sig, frame):
         global _loop

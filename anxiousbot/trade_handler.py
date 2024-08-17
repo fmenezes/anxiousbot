@@ -1,4 +1,3 @@
-import random
 from typing import Any, Dict, List, Literal
 
 from anxiousbot import exponential_backoff
@@ -57,8 +56,12 @@ class TradeHandler:
         return self._config_handler.symbols_param.keys()
 
     async def trade(
-        self, exchange_id: str, symbol: str, side: Literal["buy", "sell"], volume: float
-    ) -> None:
+        self,
+        exchange_id: str,
+        symbol: str,
+        side: Literal["buy", "sell"],
+        volume: float | None = None,
+    ) -> Dict:
         if exchange_id not in self.valid_exchange_ids():
             raise TradeException(f"exchange {exchange_id} is not valid")
         if side not in self.valid_sides():
@@ -68,7 +71,45 @@ class TradeHandler:
         client = self._exchange_handler.exchange(exchange_id)
         if client is None:
             raise TradeException(f"exchange {exchange_id} is not available")
-        await client.create_order(symbol, "market", side, volume)
+        ticker = await client.fetch_ticker(symbol)
+        if side == "buy":
+            price = ticker["ask"]
+        else:
+            price = ticker["bid"]
+        if volume is None:
+            initial_balance = await client.fetch_balance()
+            initial_balance = initial_balance.get("free")
+            base, quote = symbol.split("/")
+            if side == "buy":
+                volume = initial_balance[quote] / price
+            else:
+                volume = initial_balance[base]
+        response = await client.create_order(symbol, "market", side, volume, price)
+        fees = client.calculate_fee(symbol, "market", side, volume, price)
+        return {**response, "output": {"volume": volume, "price": price, "fees": fees}}
+
+    async def preview_trade(
+        self,
+        exchange_id: str,
+        symbol: str,
+        side: Literal["buy", "sell"],
+        volume: float | None = None,
+    ) -> Dict[str, Any]:
+        if exchange_id not in self.valid_exchange_ids():
+            raise TradeException(f"exchange {exchange_id} is not valid")
+        if side not in self.valid_sides():
+            raise TradeException(f"side {side} is not valid")
+        if symbol not in self.valid_symbols():
+            raise TradeException(f"symbol {symbol} is not valid")
+        client = self._exchange_handler.exchange(exchange_id)
+        if client is None:
+            raise TradeException(f"exchange {exchange_id} is not available")
+        balance = await client.fetch_balance()
+        order_book = await client.fetch_order_book(symbol)
+        data = self._exchange_handler.match_order_book(
+            exchange_id, balance.get("free"), side, order_book, volume
+        )
+        return data
 
     def valid_network_ids(self, coin: str, exchange_ids: List[str]) -> List[str]:
         clients = [self._exchange_handler.exchange(id) for id in exchange_ids]

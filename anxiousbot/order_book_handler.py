@@ -46,6 +46,44 @@ class OrderBookHandler:
                     for symbol in setting["symbols"]:
                         yield {**setting, "symbols": [symbol]}
 
+    async def _watch_tickers(
+        self,
+        exchange_id: str,
+        symbols: Iterator[str],
+    ) -> None:
+        while self._loop:
+            client = self._exchange_handler.exchange(exchange_id)
+            if client is None:
+                await asyncio.sleep(0.5)
+                continue
+            break
+        while self._loop:
+            try:
+                start = datetime.now()
+                tickers = await exponential_backoff(client.watch_tickers, symbols)
+
+                async def update_ticker(ticker, symbol):
+                    await self._redis_handler.set_ticker(symbol, exchange_id, ticker)
+                    duration = str(datetime.now() - start)
+                    self._logger.debug(
+                        f"Updated {exchange_id} in {duration}",
+                        extra={
+                            "exchange": exchange_id,
+                            "duration": duration,
+                            "symbol": symbol,
+                        },
+                    )
+
+                if "ask" in tickers or "bid" in tickers:
+                    await update_ticker(ticker, ticker["symbol"])
+                else:
+                    for symbol, ticker in tickers.items():
+                        await update_ticker(ticker, symbol)
+
+            except Exception as e:
+                self._logger.exception(e, extra={"exchange": exchange_id})
+            await asyncio.sleep(1)
+
     async def _watch_order_book(
         self,
         exchange_id: str,
