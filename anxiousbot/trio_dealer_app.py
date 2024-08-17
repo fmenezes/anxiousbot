@@ -60,6 +60,7 @@ class App:
                     **past_event,
                     "ts_close": past_event["ts"],
                     "type": "close",
+                    "threshold": False,
                 }
         event["duration"] = str(
             datetime.fromisoformat(event["ts"])

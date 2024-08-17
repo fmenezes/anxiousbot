@@ -89,6 +89,7 @@ class DealHandler:
                     **current_event,
                     "ts_close": current_event["ts"],
                     "type": "close",
+                    "threshold": False,
                 }
         new_event["duration"] = str(
             datetime.fromisoformat(new_event["ts"])
