@@ -1,0 +1,12 @@
+services:
+  app:
+    depends_on:
+      - redis
+    build:
+      context: .
+    env_file:
+      .env
+    environment:
+      - CACHE_ENDPOINT=redis://redis
+  redis:
+    image: redis
