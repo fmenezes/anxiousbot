@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 from redis.asyncio import Redis
 from redis.backoff import ExponentialBackoff
-from redis.exceptions import ConnectionError, TimeoutError
+from redis.exceptions import RedisError
 from redis.retry import Retry
 
 from anxiousbot.config_handler import ConfigHandler
@@ -16,7 +16,7 @@ class RedisHandler:
         self._redis_client = Redis.from_url(
             self._config_handler.cache_endpoint,
             retry=Retry(ExponentialBackoff(cap=10, base=1), 25),
-            retry_on_error=[ConnectionError, TimeoutError, ConnectionResetError],
+            retry_on_error=[RedisError, Exception],
             health_check_interval=1,
         )
 

@@ -19,7 +19,7 @@ class CalculationHandler:
         while True:
             if len(depth) <= 0:
                 return None, None
-            price, volume = depth[0]
+            price, volume = depth[0][0:2]
             if price > 0 and volume > 0:
                 return round(price, 8), round(volume, 8)
             depth = depth[1:]

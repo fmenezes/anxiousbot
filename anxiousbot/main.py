@@ -69,7 +69,9 @@ def _main() -> None:
         processes += [
             multiprocessing.Process(target=_run_trio_dealer_app, args=[logger])
         ]
-    if os.getenv("ROLE", "primary") != "primary" and os.getenv("BOT_APP", "1").lower() in [
+    if os.getenv("ROLE", "primary") != "primary" and os.getenv(
+        "BOT_APP", "1"
+    ).lower() in [
         "1",
         "t",
         "true",

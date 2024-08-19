@@ -1,4 +1,5 @@
 import asyncio
+import copy
 from contextlib import aclosing
 from datetime import datetime
 
@@ -127,8 +128,7 @@ class App:
                 ],
             )
 
-    async def execute(self):
-        exchange = "bitget"
+    def _trios(self, exchange):
         trios = self._config_handler.parameters["exchanges"][exchange]["symbol_trios"]
         trios = [
             operations
@@ -151,8 +151,11 @@ class App:
                 ]
             )
         )
-        client = await self._exchange_handler.setup_exchange(exchange)
-        missing = [symbol for symbol in symbols if symbol not in client.markets.keys()]
+        missing = [
+            symbol
+            for symbol in symbols
+            if symbol not in self._exchange_handler.exchange(exchange).markets.keys()
+        ]
         symbols = [symbol for symbol in symbols if symbol not in missing]
         trios = [
             operations
@@ -161,9 +164,32 @@ class App:
             and operations[1]["symbol"] not in missing
             and operations[2]["symbol"] not in missing
         ]
+        return trios
+
+    def _batch(self, exchange, symbols):
+        size = self._config_handler.parameters["exchanges"][exchange]["limit"] or 10
+        symbols = copy.deepcopy(symbols)
+        while len(symbols) > 0:
+            batch = symbols[:size]
+            symbols = symbols[size + 1 :]
+            yield batch
+
+    async def execute(self):
+        exchange = "bitget"
+        client = await self._exchange_handler.setup_exchange(exchange)
+        trios = self._trios(exchange)
+        symbols = list(
+            set(
+                [
+                    operation["symbol"]
+                    for operations in trios
+                    for operation in operations
+                ]
+            )
+        )
         tasks = [self._bot_handler.watch()] + [
-            self._order_book_handler._watch_order_book(client.id, [symbol], "single")
-            for symbol in symbols
+            self._order_book_handler._watch_order_book(client.id, batch, "batch")
+            for batch in self._batch(exchange, symbols)
         ]
         tasks += [self._watch_trio(exchange, operations) for operations in trios]
         await asyncio.gather(*tasks)
