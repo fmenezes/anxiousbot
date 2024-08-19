@@ -302,7 +302,7 @@ class App:
                 case "NOT_AUTH":
                     continue
                 case "ERROR":
-                    msg += f"{exchange_id}: Error: {data["exception"]}\n"
+                    msg += f"{exchange_id}: Error: {data['exception']}\n"
                 case "OK":
                     msg += f"{exchange_id}: OK\n"
                     for symbol, value in data["balance"].get("free").items():

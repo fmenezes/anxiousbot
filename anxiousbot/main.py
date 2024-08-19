@@ -36,7 +36,7 @@ def _run_trio_dealer_app(logger: logging.Logger) -> None:
         try:
             TrioDealerApp.run()
         except:
-            logger.exception("error while running dealer app")
+            logger.exception("error while running trio dealer app")
 
 
 def _main() -> None:
