@@ -152,6 +152,9 @@
         block: |
           DEALS_FILE_PREFIX={{ ansible_ec2_instance_id }}_
           AWS_REGION={{ ansible_ec2_placement_region }}
+          APP=YES
+          TRIO_APP=NO
+          BOT_APP=YES
           LOG_LEVEL=DEBUG
           LOG_HANDLER=CLOUD_WATCH
           LOG_GROUP_NAME=anxiousbot-logs

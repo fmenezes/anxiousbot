@@ -61,21 +61,22 @@ def _main() -> None:
     threading.excepthook = _thread_excepthook
     sys.excepthook = _sys_excepthook
 
-    if os.getenv("ROLE", "primary") != "primary":
-        if os.getenv("APP", "duo") != "duo":
-            return _run_trio_dealer_app(logger)
-        return _run_dealer_app(logger)
+    processes = []
 
-    processes = [
-        multiprocessing.Process(target=_run_bot_app, args=[logger]),
-    ]
-
-    if os.getenv("APP", "duo") != "duo":
+    if os.getenv("APP", "1").lower() in ["1", "t", "true", "y", "yes"]:
+        processes += [multiprocessing.Process(target=_run_dealer_app, args=[logger])]
+    if os.getenv("TRIO_APP", "1").lower() in ["1", "t", "true", "y", "yes"]:
         processes += [
             multiprocessing.Process(target=_run_trio_dealer_app, args=[logger])
         ]
-    else:
-        processes += multiprocessing.Process(target=_run_dealer_app, args=[logger])
+    if os.getenv("ROLE", "primary") != "primary" and os.getenv("BOT_APP", "1").lower() in [
+        "1",
+        "t",
+        "true",
+        "y",
+        "yes",
+    ]:
+        processes += [multiprocessing.Process(target=_run_bot_app, args=[logger])]
 
     def signal_handler(sig, frame):
         global _loop
