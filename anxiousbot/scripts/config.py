@@ -46,9 +46,9 @@ def _split_machines(d, count=None):
 
 
 async def _run():
-    with open(f"./config/symbols.json", "r") as f:
-        symbol_list = json.load(f)
-    filtered_symbol_list = _filter_symbols(symbol_list)
+    with open(f"./config/parameters.json", "r") as f:
+        parameters = json.load(f)
+    filtered_symbol_list = _filter_symbols(parameters.get("symbols"))
     data = _split_machines(filtered_symbol_list, 50)
     data = [",".join(symbols) for symbols in data]
 

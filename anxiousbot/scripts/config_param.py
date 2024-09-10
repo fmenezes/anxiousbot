@@ -4,6 +4,7 @@ import json
 
 import ccxt.pro as ccxt
 from dotenv import load_dotenv
+from coinmarketcapapi import CoinMarketCapAPI
 
 
 async def _exponential_backoff(fn, *args, **kwargs):
@@ -142,9 +143,7 @@ async def _process_exchange(exchange):
     return data
 
 
-def _all_symbols(data):
-    marketcap = _convert(list(_read_csv("./data/marketcap.csv")), "Symbol")
-
+def _all_symbols(marketcap, data):
     symbols = list(set([symbol for entry in data for symbol in entry["symbols"]]))
     print(f"all symbols: {len(symbols)}")
     symbols = [
@@ -166,8 +165,9 @@ def _all_symbols(data):
         }
         for entry in symbols
     ]
+
     symbols = [
-        {"marketcap": marketcap.get(entry["basecoin"], {}).get("#"), **entry}
+        {"marketcap": marketcap.get(entry["basecoin"]), **entry}
         for entry in symbols
     ]
     for entry in symbols:
@@ -226,6 +226,10 @@ def find_trios(symbols):
 
 
 async def _run():
+    cmc = CoinMarketCapAPI(api_key=os.getenv("COIN_MARKETCAP_API_KEY"))
+    marketcap_data = cmc.cryptocurrency_map()
+    marketcap = dict([(entry["symbol"], entry["rank"]) for entry in marketcap_data.data])
+
     exchanges = [
         exchange
         for exchange in ccxt.exchanges
@@ -250,7 +254,7 @@ async def _run():
     data = [entry for entry in data if entry is not None and len(entry["symbols"]) > 0]
     exchange_list = _convert(data, "exchange")
     parameters = {"exchanges": exchange_list}
-    symbol_list = _all_symbols(
+    symbol_list = _all_symbols(marketcap,
         [
             {
                 "exchange": entry["exchange"],
