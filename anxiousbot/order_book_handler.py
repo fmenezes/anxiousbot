@@ -113,26 +113,24 @@ class OrderBookHandler:
                             client.watch_order_book_for_symbols, param
                         )
 
-                async def update_order_book(order_book, symbol):
-                    await self._redis_handler.set_order_book(
-                        symbol, exchange_id, order_book
-                    )
-                    duration = str(datetime.now() - start)
-                    self._logger.debug(
-                        f"Updated {exchange_id} in {duration}",
-                        extra={
-                            "exchange": exchange_id,
-                            "duration": duration,
-                            "symbol": symbol,
-                        },
-                    )
-
                 if "asks" in order_book or "bids" in order_book:
-                    await update_order_book(order_book, order_book["symbol"])
+                    await self._redis_handler.set_order_book(
+                        order_book["symbol"], exchange_id, order_book
+                    )
                 else:
-                    for symbol, order in order_book.items():
-                        if symbol in self._config_handler.symbols:
-                            await update_order_book(order, symbol)
+                    order_books = [(symbol, exchange_id, ob) for symbol, ob in order_book.items()]
+                    await self._redis_handler.set_order_books(
+                        order_books
+                    )
+                duration = str(datetime.now() - start)
+                self._logger.debug(
+                    f"Updated {exchange_id} in {duration}",
+                    extra={
+                        "exchange": exchange_id,
+                        "duration": duration,
+                        "symbol": order_book.get("symbol")
+                    },
+                )
 
             except Exception as e:
                 self._logger.exception(e, extra={"exchange": exchange_id})

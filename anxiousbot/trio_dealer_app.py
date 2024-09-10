@@ -1,5 +1,6 @@
 import asyncio
 import copy
+import random
 from contextlib import aclosing
 from datetime import datetime
 
@@ -104,28 +105,14 @@ class App:
                 await self._bot_handler.enqueue_message(f"{icon} {event["message"]}")
 
     async def _watch_trio(self, exchange, operations):
-        lside = operations[0]["side"]
-        lsymbol = operations[0]["symbol"]
-        mside = operations[1]["side"]
-        msymbol = operations[1]["symbol"]
-        rside = operations[2]["side"]
-        rsymbol = operations[2]["symbol"]
-
         while self._loop:
-            lorderbook, morderbook, rorderbook = await asyncio.gather(
-                self._redis_handler.get_order_book(lsymbol, exchange),
-                self._redis_handler.get_order_book(msymbol, exchange),
-                self._redis_handler.get_order_book(rsymbol, exchange),
-            )
-            if None in [lorderbook, morderbook, rorderbook]:
+            await asyncio.sleep(0.5)
+            oper = [(exchange, operation["side"], await self._redis_handler.get_order_book(operation["symbol"], exchange)) for operation in operations]
+            if len([operation for operation in oper if operation[2] is None]) > 0:
                 continue
             await self._match(
                 {exchange: {"USDT": 100000}},
-                [
-                    (exchange, lside, lorderbook),
-                    (exchange, mside, morderbook),
-                    (exchange, rside, rorderbook),
-                ],
+                oper,
             )
 
     def _trios(self, exchange):
@@ -164,7 +151,8 @@ class App:
             and operations[1]["symbol"] not in missing
             and operations[2]["symbol"] not in missing
         ]
-        return trios
+        random.shuffle(trios)
+        return trios[:100]
 
     def _batch(self, exchange, symbols):
         size = self._config_handler.parameters["exchanges"][exchange]["limit"] or 10
@@ -175,7 +163,7 @@ class App:
             yield batch
 
     async def execute(self):
-        exchange = "bitget"
+        exchange = "binance"
         client = await self._exchange_handler.setup_exchange(exchange)
         trios = self._trios(exchange)
         symbols = list(
@@ -187,11 +175,23 @@ class App:
                 ]
             )
         )
-        tasks = [self._bot_handler.watch()] + [
-            self._order_book_handler._watch_order_book(client.id, batch, "batch")
-            for batch in self._batch(exchange, symbols)
-        ]
-        tasks += [self._watch_trio(exchange, operations) for operations in trios]
+        tasks = [asyncio.create_task(self._bot_handler.watch(), name="bot_handler")]
+        match self._config_handler.parameters["exchanges"][exchange]["mode"]:
+            case "batch":
+                tasks += [
+                    asyncio.create_task(self._order_book_handler._watch_order_book(client.id, batch, "batch"), name="watch_order_book_batch")
+                    for batch in self._batch(exchange, symbols)
+                ]
+            case "single":
+                tasks += [
+                    asyncio.create_task(self._order_book_handler._watch_order_book(client.id, [symbol], "single"), name="watch_order_book_" + symbol)
+                    for symbol in symbols
+                ]
+            case "all":
+                tasks += [
+                    asyncio.create_task(self._order_book_handler._watch_order_book(client.id, [], "all"), name="watch_order_book_all")
+                ]
+        tasks += [asyncio.create_task(self._watch_trio(exchange, operations), name="watch_trio") for operations in trios]
         await asyncio.gather(*tasks)
 
     async def aclose(self):

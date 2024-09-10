@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from redis.asyncio import Redis
 from redis.backoff import ExponentialBackoff
@@ -28,6 +28,10 @@ class RedisHandler:
 
     async def _set(self, key: str, value: Any, *args, **kwargs) -> None:
         await self._redis_client.set(key, json.dumps(value), *args, **kwargs)
+
+    async def _mset(self, data: Dict[str, Any]) -> None:
+        data = dict([(key, json.dumps(value)) for key, value in data.items()])
+        await self._redis_client.mset(data)
 
     async def get_deal(
         self, symbol: str, buy_exchange_id: str, sell_exchange_id: str
@@ -93,6 +97,14 @@ class RedisHandler:
             f"/order_book/{symbol}/{exchange_id}",
             value,
             ex=self._config_handler.expire_book_orders,
+        )
+
+    async def set_order_books(self, data: Tuple[str, str, Dict]) -> None:
+        entries = {}
+        for symbol, exchange_id, value in data:
+            entries[f"/order_book/{symbol}/{exchange_id}"] = value
+        await self._mset(
+            entries,
         )
 
     async def get_ticker(self, symbol: str, exchange_id: str) -> Dict | None:
