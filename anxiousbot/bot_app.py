@@ -1,14 +1,8 @@
 from typing import Any, Dict, List, Tuple
 
 from telegram import ForceReply, KeyboardButton, ReplyKeyboardMarkup, Update
-from telegram.ext import (
-    Application,
-    CallbackContext,
-    CommandHandler,
-    ConversationHandler,
-    MessageHandler,
-    filters,
-)
+from telegram.ext import (Application, CallbackContext, CommandHandler,
+                          ConversationHandler, MessageHandler, filters)
 
 from anxiousbot.config_handler import ConfigHandler
 from anxiousbot.exchange_handler import ExchangeHandler

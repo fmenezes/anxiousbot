@@ -1,6 +1,5 @@
 import asyncio
 import copy
-import random
 from contextlib import aclosing
 from datetime import datetime
 
@@ -107,7 +106,16 @@ class App:
     async def _watch_trio(self, exchange, operations):
         while self._loop:
             await asyncio.sleep(0.5)
-            oper = [(exchange, operation["side"], await self._redis_handler.get_order_book(operation["symbol"], exchange)) for operation in operations]
+            oper = [
+                (
+                    exchange,
+                    operation["side"],
+                    await self._redis_handler.get_order_book(
+                        operation["symbol"], exchange
+                    ),
+                )
+                for operation in operations
+            ]
             if len([operation for operation in oper if operation[2] is None]) > 0:
                 continue
             await self._match(
@@ -115,44 +123,6 @@ class App:
                 oper,
             )
 
-    def _trios(self, exchange):
-        trios = self._config_handler.parameters["exchanges"][exchange]["symbol_trios"]
-        trios = [
-            operations
-            for operations in trios
-            if (
-                operations[0]["side"] == "buy"
-                and operations[0]["symbol"].endswith("/USDT")
-            )
-            or (
-                operations[0]["side"] == "sell"
-                and operations[0]["symbol"].startswith("USDT/")
-            )
-        ]
-        symbols = list(
-            set(
-                [
-                    operation["symbol"]
-                    for operations in trios
-                    for operation in operations
-                ]
-            )
-        )
-        missing = [
-            symbol
-            for symbol in symbols
-            if symbol not in self._exchange_handler.exchange(exchange).markets.keys()
-        ]
-        symbols = [symbol for symbol in symbols if symbol not in missing]
-        trios = [
-            operations
-            for operations in trios
-            if operations[0]["symbol"] not in missing
-            and operations[1]["symbol"] not in missing
-            and operations[2]["symbol"] not in missing
-        ]
-        random.shuffle(trios)
-        return trios[:100]
 
     def _batch(self, exchange, symbols):
         size = self._config_handler.parameters["exchanges"][exchange]["limit"] or 10
@@ -163,9 +133,9 @@ class App:
             yield batch
 
     async def execute(self):
-        exchange = "binance"
+        exchange = self._config_handler.trio_exchange
         client = await self._exchange_handler.setup_exchange(exchange)
-        trios = self._trios(exchange)
+        trios = self._config_handler.trios.get(exchange)
         symbols = list(
             set(
                 [
@@ -179,19 +149,39 @@ class App:
         match self._config_handler.parameters["exchanges"][exchange]["mode"]:
             case "batch":
                 tasks += [
-                    asyncio.create_task(self._order_book_handler._watch_order_book(client.id, batch, "batch"), name="watch_order_book_batch")
+                    asyncio.create_task(
+                        self._order_book_handler._watch_order_book(
+                            client.id, batch, "batch"
+                        ),
+                        name="watch_order_book_batch",
+                    )
                     for batch in self._batch(exchange, symbols)
                 ]
             case "single":
                 tasks += [
-                    asyncio.create_task(self._order_book_handler._watch_order_book(client.id, [symbol], "single"), name="watch_order_book_" + symbol)
+                    asyncio.create_task(
+                        self._order_book_handler._watch_order_book(
+                            client.id, [symbol], "single"
+                        ),
+                        name="watch_order_book_" + symbol,
+                    )
                     for symbol in symbols
                 ]
             case "all":
                 tasks += [
-                    asyncio.create_task(self._order_book_handler._watch_order_book(client.id, [], "all"), name="watch_order_book_all")
+                    asyncio.create_task(
+                        self._order_book_handler._watch_order_book(
+                            client.id, [], "all"
+                        ),
+                        name="watch_order_book_all",
+                    )
                 ]
-        tasks += [asyncio.create_task(self._watch_trio(exchange, operations), name="watch_trio") for operations in trios]
+        tasks += [
+            asyncio.create_task(
+                self._watch_trio(exchange, operations), name="watch_trio"
+            )
+            for operations in trios
+        ]
         await asyncio.gather(*tasks)
 
     async def aclose(self):

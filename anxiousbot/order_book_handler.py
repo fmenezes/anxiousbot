@@ -118,17 +118,17 @@ class OrderBookHandler:
                         order_book["symbol"], exchange_id, order_book
                     )
                 else:
-                    order_books = [(symbol, exchange_id, ob) for symbol, ob in order_book.items()]
-                    await self._redis_handler.set_order_books(
-                        order_books
-                    )
+                    order_books = [
+                        (symbol, exchange_id, ob) for symbol, ob in order_book.items()
+                    ]
+                    await self._redis_handler.set_order_books(order_books)
                 duration = str(datetime.now() - start)
                 self._logger.debug(
                     f"Updated {exchange_id} in {duration}",
                     extra={
                         "exchange": exchange_id,
                         "duration": duration,
-                        "symbol": order_book.get("symbol")
+                        "symbol": order_book.get("symbol"),
                     },
                 )
 

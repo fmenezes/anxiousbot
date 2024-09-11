@@ -35,7 +35,10 @@ class ConfigHandler:
             self._expire_deal_events = int(DEFAULT_EXPIRE_BOOK_ORDERS)
         with open("./config/parameters.json", "r") as f:
             self._parameters = json.load(f)
-
+        with open("./config/trios.json", "r") as f:
+            self._trios = json.load(f)
+        self._trio_exchange = os.getenv("TRIO_APP_EXCHANGE", "binance")
+        
     @property
     def role(self):
         return self._role
@@ -78,3 +81,12 @@ class ConfigHandler:
     @property
     def parameters(self) -> Dict:
         return self._parameters
+
+    @property
+    def trios(self) -> Dict:
+        return self._trios
+
+    @property
+    def trio_exchange(self) -> str:
+        return self._trio_exchange
+
