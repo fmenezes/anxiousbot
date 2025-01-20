@@ -1,0 +1,3 @@
+# anxiousbot
+
+trading without patience
