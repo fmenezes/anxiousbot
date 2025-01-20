@@ -1,6 +1,6 @@
 export default {
-  base: '/anxiousbot/',  // Replace with your repository name
+  base: '/anxiousbot/',
   build: {
-    outDir: 'dist',  // The folder where build files will be stored
+    outDir: 'dist',
   },
 }
