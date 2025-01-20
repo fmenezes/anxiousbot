@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # Allow write access to repository contents (for deploying to Pages)
+      pages: write     # Allow write access to GitHub Pages (for deploying)
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
