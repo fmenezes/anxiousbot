@@ -28,10 +28,13 @@ jobs:
     - name: Build the project
       run: npm run build
 
-    - name: Git config
-      run: git remote set-url origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" && git config user.name "${{ github.actor }}" && git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+    - name: Setup Pages
+      uses: actions/configure-pages@v5
+    
+    - name: Upload Artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: 'dist/'
 
     - name: Deploy to GitHub Pages
-      run: npm run deploy
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: actions/deploy-pages@v4
