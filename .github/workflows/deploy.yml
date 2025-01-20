@@ -10,8 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write  # Allow write access to repository contents (for deploying to Pages)
-      pages: write     # Allow write access to GitHub Pages (for deploying)
+      contents: read
+      pages: write
+      id-token: write
 
     steps:
     - name: Checkout code
