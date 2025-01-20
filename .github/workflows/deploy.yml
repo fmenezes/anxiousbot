@@ -16,8 +16,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Node.js
       uses: actions/setup-node@v2
@@ -29,6 +27,9 @@ jobs:
 
     - name: Build the project
       run: npm run build
+
+    - name: Git config
+      run: git config user.name "${{ github.actor }}" && git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
 
     - name: Deploy to GitHub Pages
       run: npm run deploy
