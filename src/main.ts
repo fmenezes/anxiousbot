@@ -77,7 +77,7 @@ function delay(ms: number) {
     return new Promise( resolve => setTimeout(resolve, ms) );
 }
 
-try {
+async function run() {
   const connection = new Connection(url);
 
   info(`connecting...`);
@@ -93,7 +93,7 @@ try {
     }
     await delay(1000);
   }
-
-} catch(err: any) {
-  error(err.message + "\n" + err.stack);
 }
+run().catch((err: Error) => {
+  error(err.message + "\n" + err.stack);
+});
