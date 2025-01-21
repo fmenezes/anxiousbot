@@ -14,9 +14,9 @@ function error(msg: string) {
   return log('ERROR', msg);
 }
 
-import { Connection, PublicKey, TransactionResponse } from "@solana/web3.js";
+import { clusterApiUrl, Connection, PublicKey, TransactionResponse } from "@solana/web3.js";
 
-const url = "https://broken-autumn-ensemble.solana-mainnet.quiknode.pro/caf127f77fcfbd4d441b47a01176249b96c238a7/";
+const url = ENDPOINT_URL || clusterApiUrl("mainnet-beta");
 
 // Solana connection
 // Program IDs for Solana DEXes
