@@ -4,14 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "NODE_ENV=development vite",
+    "build": "NODE_ENV=production vite build",
+    "preview": "NODE_ENV=development vite preview"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
     "typescript": "^5.7.3",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "vite-plugin-node-polyfills": "^0.23.0"
   },
   "dependencies": {
     "@solana/web3.js": "^1.98.0",
